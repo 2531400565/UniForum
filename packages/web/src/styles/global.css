@@ -11,3 +11,13 @@ a { text-decoration: none; color: inherit; }
 .page-container { max-width: 1200px; margin: 24px auto; padding: 0 24px; }
 
 .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: box-shadow 0.3s; }
+
+/* 富文本帖子内容样式 */
+.post-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0; }
+.post-content p { margin-bottom: 12px; }
+.post-content h1, .post-content h2, .post-content h3 { margin: 16px 0 8px; }
+.post-content blockquote { border-left: 4px solid #1677ff; padding-left: 12px; margin: 12px 0; color: #666; background: #f6f6f6; border-radius: 4px; }
+.post-content pre { background: #f6f6f6; padding: 12px; border-radius: 6px; overflow-x: auto; }
+.post-content code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+.post-content ul, .post-content ol { padding-left: 24px; margin-bottom: 12px; }
+.post-content a { color: #1677ff; text-decoration: underline; }

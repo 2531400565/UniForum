@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Card, Avatar, Typography, Descriptions, Tag, Space, Spin, Button, Form, Input, Modal, message } from 'antd';
+import { Card, Avatar, Typography, Descriptions, Tag, Space, Spin, Button, Form, Input, Modal, message, Tabs, List, Empty } from 'antd';
 import { UserOutlined, EditOutlined } from '@ant-design/icons';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
+import dayjs from 'dayjs';
 
 export default function ProfilePage() {
   const { id } = useParams();
@@ -12,10 +13,19 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [form] = Form.useForm();
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [favLoading, setFavLoading] = useState(false);
 
   useEffect(() => {
     request.get(`/users/${id}`).then((res: any) => setProfile(res.data)).finally(() => setLoading(false));
   }, [id]);
+
+  const fetchFavorites = () => {
+    setFavLoading(true);
+    request.get('/favorites', { params: { pageSize: 20 } }).then((res: any) => {
+      setFavorites(res.data?.list || []);
+    }).finally(() => setFavLoading(false));
+  };
 
   const handleEdit = async (values: any) => {
     try {
@@ -32,7 +42,7 @@ export default function ProfilePage() {
   const isOwner = currentUser?.id === profile.id;
 
   return (
-    <div className="page-container" style={{ maxWidth: 600 }}>
+    <div className="page-container" style={{ maxWidth: 700 }}>
       <Card>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <Avatar size={80} src={profile.avatar_url} icon={<UserOutlined />} />
@@ -52,6 +62,37 @@ export default function ProfilePage() {
         </Descriptions>
         {isOwner && <Button type="primary" icon={<EditOutlined />} style={{ marginTop: 16 }} onClick={() => { setEditOpen(true); form.setFieldsValue(profile); }}>编辑资料</Button>}
       </Card>
+
+      {isOwner && (
+        <Card style={{ marginTop: 16 }}>
+          <Tabs items={[{
+            key: 'favorites',
+            label: `我的收藏 (${favorites.length})`,
+            children: (
+              <List
+                loading={favLoading}
+                dataSource={favorites}
+                locale={{ emptyText: <Empty description="暂无收藏" /> }}
+                renderItem={(item: any) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      title={<Link to={`/forum/post/${item.id}`}>{item.title}</Link>}
+                      description={
+                        <Space>
+                          <Tag>{item.board?.name}</Tag>
+                          <Typography.Text type="secondary">{item.author?.nickname}</Typography.Text>
+                          <Typography.Text type="secondary">{dayjs(item.created_at).format('YYYY-MM-DD')}</Typography.Text>
+                          <Typography.Text type="secondary">♥ {item.like_count} 💬 {item.comment_count}</Typography.Text>
+                        </Space>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            ),
+          }]} onChange={() => fetchFavorites()} />
+        </Card>
+      )}
 
       <Modal title="编辑资料" open={editOpen} onCancel={() => setEditOpen(false)} onOk={() => form.submit()}>
         <Form form={form} layout="vertical" onFinish={handleEdit}>

@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { Op } from 'sequelize';
-import { Post, Board, User, Like, Comment, Notification } from '../models';
+import { Post, Board, User, Like, Comment, Notification, Favorite } from '../models';
 import { success, fail } from '../utils/response';
 import { AuthRequest } from '../middlewares/auth';
 import { getPagination, paginatedResult } from '../utils/pagination';
@@ -13,7 +13,7 @@ export async function getPosts(req: AuthRequest, res: Response) {
     if (boardId) where.board_id = parseInt(boardId as string);
     if (keyword) where.title = { [Op.like]: `%${keyword}%` };
 
-    const order: any[] = [['type', 'DESC']];
+    const order: any[] = [['is_essential', 'DESC'], ['type', 'DESC']];
     if (sort === 'hot') order.push(['like_count', 'DESC']);
     order.push(['created_at', 'DESC']);
 
@@ -58,6 +58,8 @@ export async function getPost(req: AuthRequest, res: Response) {
     if (req.userId) {
       const like = await Like.findOne({ where: { user_id: req.userId, post_id: post.id } });
       postData.isLiked = !!like;
+      const fav = await Favorite.findOne({ where: { user_id: req.userId, post_id: post.id } });
+      postData.isFavorited = !!fav;
     }
 
     return success(res, postData);
@@ -179,4 +181,60 @@ export async function getLikeStatus(req: AuthRequest, res: Response) {
   } catch (error: any) {
     return fail(res, error.message, 500);
   }
+}
+
+// ============ 收藏 ============
+export async function favoritePost(req: AuthRequest, res: Response) {
+  try {
+    const postId = parseInt(req.params.id);
+    const post = await Post.findByPk(postId);
+    if (!post) return fail(res, '帖子不存在', 404);
+    const [fav, created] = await Favorite.findOrCreate({ where: { user_id: req.userId!, post_id: postId } });
+    if (!created) return fail(res, '已收藏过');
+    return success(res, null, '收藏成功', 201);
+  } catch (error: any) { return fail(res, error.message, 500); }
+}
+
+export async function unfavoritePost(req: AuthRequest, res: Response) {
+  try {
+    const postId = parseInt(req.params.id);
+    const fav = await Favorite.findOne({ where: { user_id: req.userId!, post_id: postId } });
+    if (!fav) return fail(res, '未收藏');
+    await fav.destroy();
+    return success(res, null, '取消收藏成功');
+  } catch (error: any) { return fail(res, error.message, 500); }
+}
+
+export async function getUserFavorites(req: AuthRequest, res: Response) {
+  try {
+    const { limit, offset, page, pageSize } = getPagination(req.query.page, req.query.pageSize);
+    const { count, rows } = await Favorite.findAndCountAll({
+      where: { user_id: req.userId! },
+      include: [{ model: Post, as: 'post', include: [{ model: User, as: 'author', attributes: ['id', 'nickname', 'avatar_url'] }, { model: Board, as: 'board', attributes: ['id', 'name'] }], where: { status: 'active' } }],
+      limit, offset, order: [['created_at', 'DESC']],
+    });
+    const list = rows.map(r => r.post.toJSON());
+    return success(res, paginatedResult(list, count, page, pageSize));
+  } catch (error: any) { return fail(res, error.message, 500); }
+}
+
+// ============ 置顶/精华 ============
+export async function togglePin(req: AuthRequest, res: Response) {
+  try {
+    const post = await Post.findByPk(parseInt(req.params.id));
+    if (!post) return fail(res, '帖子不存在', 404);
+    post.type = post.type === 'pinned' ? 'normal' : 'pinned';
+    await post.save();
+    return success(res, { is_pinned: post.type === 'pinned' }, post.type === 'pinned' ? '已置顶' : '已取消置顶');
+  } catch (error: any) { return fail(res, error.message, 500); }
+}
+
+export async function toggleEssential(req: AuthRequest, res: Response) {
+  try {
+    const post = await Post.findByPk(parseInt(req.params.id));
+    if (!post) return fail(res, '帖子不存在', 404);
+    post.is_essential = !post.is_essential;
+    await post.save();
+    return success(res, { is_essential: post.is_essential }, post.is_essential ? '已标为精华' : '已取消精华');
+  } catch (error: any) { return fail(res, error.message, 500); }
 }

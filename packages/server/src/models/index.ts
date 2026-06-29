@@ -34,8 +34,8 @@ export class User extends Model<UserAttributes, Optional<UserAttributes, 'id' | 
 
 User.init({
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  student_id: { type: DataTypes.STRING(20), unique: true, allowNull: true },
-  email: { type: DataTypes.STRING(100), unique: true, allowNull: false },
+  student_id: { type: DataTypes.STRING(20), allowNull: true },
+  email: { type: DataTypes.STRING(100), allowNull: false },
   password_hash: { type: DataTypes.STRING(255), allowNull: false },
   nickname: { type: DataTypes.STRING(50), allowNull: false },
   avatar_url: { type: DataTypes.STRING(500), allowNull: true },
@@ -122,6 +122,7 @@ Post.init({
   view_count: { type: DataTypes.INTEGER, defaultValue: 0 },
   like_count: { type: DataTypes.INTEGER, defaultValue: 0 },
   comment_count: { type: DataTypes.INTEGER, defaultValue: 0 },
+  is_essential: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, { sequelize, tableName: 'posts', indexes: [{ fields: ['board_id'] }, { fields: ['author_id'] }, { fields: ['created_at'] }] });
 
 // ============ Comment ============
@@ -155,6 +156,7 @@ Comment.init({
   parent_id: { type: DataTypes.INTEGER, allowNull: true },
   reply_to_id: { type: DataTypes.INTEGER, allowNull: true },
   status: { type: DataTypes.ENUM('active', 'deleted'), defaultValue: 'active' },
+  like_count: { type: DataTypes.INTEGER, defaultValue: 0 },
 }, { sequelize, tableName: 'comments', indexes: [{ fields: ['post_id'] }, { fields: ['parent_id'] }] });
 
 // ============ Like ============
@@ -177,6 +179,19 @@ Like.init({
   user_id: { type: DataTypes.INTEGER, allowNull: false },
   post_id: { type: DataTypes.INTEGER, allowNull: false },
 }, { sequelize, tableName: 'likes', indexes: [{ unique: true, fields: ['user_id', 'post_id'] }] });
+
+// ============ CommentLike ============
+export class CommentLike extends Model {
+  declare id: number;
+  declare user_id: number;
+  declare comment_id: number;
+}
+
+CommentLike.init({
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  user_id: { type: DataTypes.INTEGER, allowNull: false },
+  comment_id: { type: DataTypes.INTEGER, allowNull: false },
+}, { sequelize, tableName: 'comment_likes', indexes: [{ unique: true, fields: ['user_id', 'comment_id'] }] });
 
 // ============ Announcement ============
 interface AnnouncementAttributes {
@@ -502,6 +517,19 @@ Notification.init({
   is_read: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, { sequelize, tableName: 'notifications', indexes: [{ fields: ['user_id', 'is_read'] }] });
 
+// ============ Favorite ============
+export class Favorite extends Model {
+  declare id: number;
+  declare user_id: number;
+  declare post_id: number;
+}
+
+Favorite.init({
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  user_id: { type: DataTypes.INTEGER, allowNull: false },
+  post_id: { type: DataTypes.INTEGER, allowNull: false },
+}, { sequelize, tableName: 'favorites', indexes: [{ unique: true, fields: ['user_id', 'post_id'] }] });
+
 // ============ Associations ============
 // Board
 Board.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
@@ -512,6 +540,7 @@ Post.belongsTo(User, { foreignKey: 'author_id', as: 'author' });
 Post.belongsTo(Board, { foreignKey: 'board_id', as: 'board' });
 Post.hasMany(Comment, { foreignKey: 'post_id', as: 'comments' });
 Post.hasMany(Like, { foreignKey: 'post_id', as: 'likes' });
+Post.hasMany(Favorite, { foreignKey: 'post_id', as: 'favorites' });
 
 // Comment
 Comment.belongsTo(User, { foreignKey: 'author_id', as: 'author' });
@@ -523,6 +552,10 @@ Comment.belongsTo(User, { foreignKey: 'reply_to_id', as: 'replyTo' });
 // Like
 Like.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 Like.belongsTo(Post, { foreignKey: 'post_id', as: 'post' });
+
+// CommentLike
+CommentLike.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+CommentLike.belongsTo(Comment, { foreignKey: 'comment_id', as: 'comment' });
 
 // Announcement
 Announcement.belongsTo(User, { foreignKey: 'publisher_id', as: 'publisher' });
@@ -553,5 +586,9 @@ Answer.belongsTo(User, { foreignKey: 'author_id', as: 'author' });
 // Notification
 Notification.belongsTo(User, { foreignKey: 'user_id', as: 'receiver' });
 Notification.belongsTo(User, { foreignKey: 'sender_id', as: 'sender' });
+
+// Favorite
+Favorite.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+Favorite.belongsTo(Post, { foreignKey: 'post_id', as: 'post' });
 
 export { sequelize };

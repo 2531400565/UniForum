@@ -44,8 +44,7 @@ export default function BoardDetail() {
         renderItem={(item: any) => (
           <List.Item style={{ cursor: 'pointer', background: '#fff', padding: '12px 16px', marginBottom: 8, borderRadius: 8 }} onClick={() => navigate(`/forum/post/${item.id}`)}>
             <List.Item.Meta
-              title={<Space>{item.type === 'pinned' && <PushpinOutlined style={{ color: '#ff4d4f' }} />}
-                <span>{item.title}</span></Space>}
+              title={<Space>{item.type === 'pinned' && <Tag color="orange">置顶</Tag>}{item.is_essential && <Tag color="gold">精华</Tag>}<span>{item.title}</span></Space>}
               description={<Space size="large">
                 <span>{item.author?.nickname}</span>
                 <span>{dayjs(item.created_at).format('YYYY-MM-DD HH:mm')}</span>

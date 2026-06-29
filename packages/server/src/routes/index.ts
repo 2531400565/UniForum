@@ -47,11 +47,18 @@ router.delete('/posts/:id', auth, postCtrl.deletePost);
 router.post('/posts/:id/like', auth, postCtrl.likePost);
 router.delete('/posts/:id/like', auth, postCtrl.unlikePost);
 router.get('/posts/:id/like-status', auth, postCtrl.getLikeStatus);
+router.post('/posts/:id/favorite', auth, postCtrl.favoritePost);
+router.delete('/posts/:id/favorite', auth, postCtrl.unfavoritePost);
+router.get('/favorites', auth, postCtrl.getUserFavorites);
+router.put('/posts/:id/pin', auth, requireRole('admin', 'moderator'), postCtrl.togglePin);
+router.put('/posts/:id/essential', auth, requireRole('admin', 'moderator'), postCtrl.toggleEssential);
 
 // Comments
 router.get('/posts/:postId/comments', commentCtrl.getComments);
 router.post('/posts/:postId/comments', auth, commentCtrl.createComment);
 router.delete('/comments/:id', auth, commentCtrl.deleteComment);
+router.post('/comments/:id/like', auth, commentCtrl.likeComment);
+router.delete('/comments/:id/like', auth, commentCtrl.unlikeComment);
 
 // Announcements
 router.get('/announcements', announcementCtrl.getAnnouncements);
