@@ -9,11 +9,12 @@ import { sanitizeText } from '../utils/sanitize';
 export async function getList(req: AuthRequest, res: Response) {
   try {
     const { limit, offset, page, pageSize } = getPagination(req.query.page, req.query.pageSize);
-    const { type, status, keyword } = req.query;
+    const { type, status, keyword, itemCategory } = req.query;
     const where: any = {};
     if (status && status !== 'all') where.status = status;
     else if (!status) where.status = 'open';
     if (type) where.type = type;
+    if (itemCategory) where.item_category = itemCategory;
     if (keyword) where.title = { [Op.like]: `%${keyword}%` };
     const { count, rows } = await LostAndFound.findAndCountAll({
       where, include: [{ model: User, as: 'author', attributes: ['id', 'nickname', 'avatar_url'] }],

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Typography, Tabs, List, Tag, Card, Space } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
+import { Typography, Tabs, List, Tag, Card, Space, Button, message } from 'antd';
+import { SearchOutlined, DownloadOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import dayjs from 'dayjs';
 import { ListSkeleton } from '../../components/Skeleton';
@@ -43,8 +43,39 @@ export default function SearchResults() {
     { key: 'resources', label: `资源 (${data.resources?.length || 0})`, children: (
       <List dataSource={data.resources} renderItem={(item: any) => (
         <Card size="small" style={{ marginBottom: 8 }}>
-          <Typography.Text strong>{item.title}</Typography.Text>
-          <Tag style={{ marginLeft: 8 }}>{item.file_type}</Tag>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate('/resources')}>
+            <div>
+              <Typography.Text strong>{item.title}</Typography.Text>
+              <Tag style={{ marginLeft: 8 }}>{item.file_type}</Tag>
+              <Typography.Text type="secondary" style={{ marginLeft: 16 }}>{item.uploader?.nickname} · {dayjs(item.created_at).format('MM-DD')}</Typography.Text>
+            </div>
+            <Button size="small" type="primary" icon={<DownloadOutlined />} onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                const token = localStorage.getItem('accessToken');
+                const resp = await fetch(`/api/v1/resources/${item.id}/download`, {
+                  headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                if (!resp.ok) throw new Error('下载失败');
+                const blob = await resp.blob();
+                let filename = item.file_name || `resource_${item.id}`;
+                const disposition = resp.headers.get('Content-Disposition');
+                if (disposition) {
+                  const match = disposition.match(/filename\*=UTF-8''(.+?)(?:;|$)/);
+                  if (match) filename = decodeURIComponent(match[1]);
+                }
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                message.success('下载成功');
+              } catch (err: any) { message.error('下载失败'); }
+            }}>下载</Button>
+          </div>
         </Card>
       )} />
     )},

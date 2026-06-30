@@ -131,22 +131,22 @@ router.get('/search', async (req, res) => {
     const results: any = { posts: [], questions: [], resources: [], announcements: [], lostFound: [], marketItems: [] };
 
     if (!type || type === 'post') {
-      tasks.push(Post.findAll({ where: { title: { [Op.like]: kw }, status: 'active' }, include: [{ model: User, as: 'author', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.posts = r; }));
+      tasks.push(Post.findAll({ where: { [Op.or]: [{ title: { [Op.like]: kw } }, { content: { [Op.like]: kw } }], status: 'active' }, include: [{ model: User, as: 'author', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.posts = r; }));
     }
     if (!type || type === 'question') {
-      tasks.push(Question.findAll({ where: { title: { [Op.like]: kw } }, include: [{ model: User, as: 'author', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.questions = r; }));
+      tasks.push(Question.findAll({ where: { [Op.or]: [{ title: { [Op.like]: kw } }, { content: { [Op.like]: kw } }] }, include: [{ model: User, as: 'author', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.questions = r; }));
     }
     if (!type || type === 'resource') {
-      tasks.push(Resource.findAll({ where: { title: { [Op.like]: kw }, status: 'active' }, include: [{ model: User, as: 'uploader', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.resources = r; }));
+      tasks.push(Resource.findAll({ where: { [Op.or]: [{ title: { [Op.like]: kw } }, { description: { [Op.like]: kw } }], status: 'active' }, include: [{ model: User, as: 'uploader', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.resources = r; }));
     }
     if (!type || type === 'announcement') {
-      tasks.push(Announcement.findAll({ where: { title: { [Op.like]: kw }, status: 'active' }, include: [{ model: User, as: 'publisher', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.announcements = r; }));
+      tasks.push(Announcement.findAll({ where: { [Op.or]: [{ title: { [Op.like]: kw } }, { content: { [Op.like]: kw } }], status: 'active' }, include: [{ model: User, as: 'publisher', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.announcements = r; }));
     }
     if (!type || type === 'lostFound') {
-      tasks.push(LostAndFound.findAll({ where: { title: { [Op.like]: kw } }, include: [{ model: User, as: 'author', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.lostFound = r; }));
+      tasks.push(LostAndFound.findAll({ where: { [Op.or]: [{ title: { [Op.like]: kw } }, { description: { [Op.like]: kw } }] }, include: [{ model: User, as: 'author', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.lostFound = r; }));
     }
     if (!type || type === 'marketplace') {
-      tasks.push(MarketItem.findAll({ where: { title: { [Op.like]: kw }, status: { [Op.in]: ['selling', 'reserved'] } }, include: [{ model: User, as: 'seller', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.marketItems = r; }));
+      tasks.push(MarketItem.findAll({ where: { [Op.or]: [{ title: { [Op.like]: kw } }, { description: { [Op.like]: kw } }], status: { [Op.in]: ['selling', 'reserved'] } }, include: [{ model: User, as: 'seller', attributes: ['id', 'nickname'] }], limit: 10, order: [['created_at', 'DESC']] }).then((r: any) => { results.marketItems = r; }));
     }
 
     await Promise.all(tasks);

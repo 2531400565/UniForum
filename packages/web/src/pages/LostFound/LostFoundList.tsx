@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { List, Typography, Tag, Pagination, Card, Button, Tabs, Space, Modal, Form, Input, Select, message, Popconfirm } from 'antd';
-import { HeartOutlined, PlusOutlined, EnvironmentOutlined, PhoneOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { List, Typography, Tag, Pagination, Card, Button, Tabs, Space, Modal, Form, Input, Select, message, Popconfirm, Upload } from 'antd';
+import { HeartOutlined, PlusOutlined, EnvironmentOutlined, PhoneOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
@@ -12,6 +12,8 @@ const statusConfig: any = {
   closed: { label: '已关闭', color: 'default' },
 };
 
+const itemCategoryLabels: any = { certificate: '证件', electronics: '电子产品', daily: '日用品', other: '其他' };
+
 export default function LostFoundList() {
   const { isLoggedIn, user } = useAuthStore();
   const [data, setData] = useState<any[]>([]);
@@ -19,26 +21,41 @@ export default function LostFoundList() {
   const [page, setPage] = useState(1);
   const [type, setType] = useState('');
   const [status, setStatus] = useState('open');
+  const [itemCategory, setItemCategory] = useState('');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+  const [fileList, setFileList] = useState<any[]>([]);
+  const [editFileList, setEditFileList] = useState<any[]>([]);
 
   const fetchData = () => {
     setLoading(true);
-    request.get('/lost-found', { params: { page, pageSize: 15, type: type || undefined, status } }).then((res: any) => {
+    request.get('/lost-found', { params: { page, pageSize: 15, type: type || undefined, status, itemCategory: itemCategory || undefined } }).then((res: any) => {
       setData(res.data?.list || []); setTotal(res.data?.total || 0);
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [page, type, status]);
+  useEffect(() => { fetchData(); }, [page, type, status, itemCategory]);
 
   const handleCreate = async (values: any) => {
     try {
-      await request.post('/lost-found', values);
-      message.success('发布成功'); setModalOpen(false); form.resetFields(); fetchData();
+      // 先上传图片
+      const imageUrls: string[] = [];
+      for (const file of fileList) {
+        if (file.originFileObj) {
+          const formData = new FormData();
+          formData.append('image', file.originFileObj);
+          const resp: any = await request.post('/upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+          if (resp.data?.url) imageUrls.push(resp.data.url);
+        } else if (file.url) {
+          imageUrls.push(file.url);
+        }
+      }
+      await request.post('/lost-found', { ...values, images: imageUrls.length > 0 ? imageUrls : null });
+      message.success('发布成功'); setModalOpen(false); form.resetFields(); setFileList([]); fetchData();
     } catch (err: any) { message.error(err.message); }
   };
 
@@ -53,13 +70,28 @@ export default function LostFoundList() {
   const handleEdit = (item: any) => {
     setEditItem(item);
     editForm.setFieldsValue({ title: item.title, description: item.description, location: item.location, contactInfo: item.contact_info });
+    // 设置已有图片
+    const images = item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : [];
+    setEditFileList(images.map((url: string, i: number) => ({ uid: `-${i}`, name: `image-${i}`, status: 'done', url })));
     setEditModalOpen(true);
   };
 
   const handleEditSubmit = async (values: any) => {
     try {
-      await request.put(`/lost-found/${editItem.id}`, values);
-      message.success('更新成功'); setEditModalOpen(false); fetchData();
+      // 先上传新图片
+      const imageUrls: string[] = [];
+      for (const file of editFileList) {
+        if (file.originFileObj) {
+          const formData = new FormData();
+          formData.append('image', file.originFileObj);
+          const resp: any = await request.post('/upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+          if (resp.data?.url) imageUrls.push(resp.data.url);
+        } else if (file.url) {
+          imageUrls.push(file.url);
+        }
+      }
+      await request.put(`/lost-found/${editItem.id}`, { ...values, images: imageUrls.length > 0 ? imageUrls : null });
+      message.success('更新成功'); setEditModalOpen(false); setEditFileList([]); fetchData();
     } catch (err: any) { message.error(err.message); }
   };
 
@@ -84,6 +116,12 @@ export default function LostFoundList() {
       <Tabs activeKey={status} onChange={(k) => { setStatus(k); setPage(1); }} items={[
         { key: 'open', label: '进行中' }, { key: 'resolved', label: '已解决' }, { key: 'closed', label: '已关闭' }, { key: 'all', label: '全部' },
       ]} style={{ marginBottom: 16 }} />
+      <Space style={{ marginBottom: 16 }} wrap>
+        <Typography.Text>物品类别:</Typography.Text>
+        {['', 'certificate', 'electronics', 'daily', 'other'].map(k => (
+          <Tag.CheckableTag key={k} checked={itemCategory === k} onChange={() => { setItemCategory(k); setPage(1); }}>{k ? itemCategoryLabels[k] : '全部'}</Tag.CheckableTag>
+        ))}
+      </Space>
       {loading ? <ListSkeleton rows={6} /> : (
         <List dataSource={data} renderItem={(item: any) => (
           <Card style={{ marginBottom: 12 }} hoverable>
@@ -132,6 +170,7 @@ export default function LostFoundList() {
           <Form.Item name="description" label="描述" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item>
           <Form.Item name="location" label="地点"><Input /></Form.Item>
           <Form.Item name="contactInfo" label="联系方式"><Input /></Form.Item>
+          <Form.Item label="图片"><Upload beforeUpload={() => false} fileList={fileList} onChange={({ fileList }) => setFileList(fileList)} listType="picture-card" maxCount={5}><div><UploadOutlined /><div style={{ marginTop: 8 }}>上传图片</div></div></Upload></Form.Item>
         </Form>
       </Modal>
       <Modal title="编辑失物招领" open={editModalOpen} onCancel={() => setEditModalOpen(false)} onOk={() => editForm.submit()} width={500}>
@@ -140,6 +179,7 @@ export default function LostFoundList() {
           <Form.Item name="description" label="描述" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item>
           <Form.Item name="location" label="地点"><Input /></Form.Item>
           <Form.Item name="contactInfo" label="联系方式"><Input /></Form.Item>
+          <Form.Item label="图片"><Upload beforeUpload={() => false} fileList={editFileList} onChange={({ fileList }) => setEditFileList(fileList)} listType="picture-card" maxCount={5}><div><UploadOutlined /><div style={{ marginTop: 8 }}>上传图片</div></div></Upload></Form.Item>
         </Form>
       </Modal>
     </div>

@@ -1,39 +1,67 @@
 import { useEffect, useState } from 'react';
-import { Typography, Tag, Pagination, Card, Button, Space, Modal, Form, Input, Select, InputNumber, message, Row, Col, Empty, Tooltip, Popconfirm } from 'antd';
-import { ShopOutlined, PlusOutlined, PhoneOutlined, CheckCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { Typography, Tag, Pagination, Card, Button, Space, Modal, Form, Input, Select, InputNumber, message, Row, Col, Empty, Tooltip, Popconfirm, Upload } from 'antd';
+import { ShopOutlined, PlusOutlined, PhoneOutlined, CheckCircleOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
 import { ListSkeleton } from '../../components/Skeleton';
 
 const conditionLabels: any = { new: '全新', like_new: '几乎全新', good: '良好', fair: '一般', poor: '较差' };
+const categoryLabels: any = { textbook: '教材', electronics: '电子产品', daily: '生活用品', other: '其他' };
+const sortOptions = [
+  { label: '最新发布', value: 'newest' },
+  { label: '价格最低', value: 'price_asc' },
+  { label: '价格最高', value: 'price_desc' },
+];
 
 export default function MarketList() {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [category, setCategory] = useState('');
+  const [sort, setSort] = useState('newest');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+  const [fileList, setFileList] = useState<any[]>([]);
+  const [editFileList, setEditFileList] = useState<any[]>([]);
 
   const fetchData = () => {
     setLoading(true);
-    request.get('/marketplace', { params: { page, pageSize: 12, status: 'all' } }).then((res: any) => {
-      setData(res.data?.list || []); setTotal(res.data?.total || 0);
+    request.get('/marketplace', { params: { page, pageSize: 12, status: 'all', category: category || undefined } }).then((res: any) => {
+      let list = res.data?.list || [];
+      // 前端排序
+      if (sort === 'price_asc') list.sort((a: any, b: any) => a.price - b.price);
+      else if (sort === 'price_desc') list.sort((a: any, b: any) => b.price - a.price);
+      setData(list); setTotal(res.data?.total || 0);
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [page]);
+  useEffect(() => { fetchData(); }, [page, category, sort]);
 
   const handleCreate = async (values: any) => {
     try {
-      await request.post('/marketplace', values);
-      message.success('发布成功'); setModalOpen(false); form.resetFields(); fetchData();
+      // 先上传图片
+      const imageUrls: string[] = [];
+      for (const file of fileList) {
+        if (file.originFileObj) {
+          const formData = new FormData();
+          formData.append('image', file.originFileObj);
+          const resp: any = await request.post('/upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+          if (resp.data?.url) imageUrls.push(resp.data.url);
+        } else if (file.url) {
+          imageUrls.push(file.url);
+        }
+      }
+      await request.post('/marketplace', { ...values, images: imageUrls.length > 0 ? imageUrls : null });
+      message.success('发布成功'); setModalOpen(false); form.resetFields(); setFileList([]); fetchData();
     } catch (err: any) { message.error(err.message); }
   };
 
@@ -47,13 +75,28 @@ export default function MarketList() {
   const handleEdit = (item: any) => {
     setEditItem(item);
     editForm.setFieldsValue({ title: item.title, description: item.description, price: item.price, originalPrice: item.original_price, conditionLevel: item.condition_level, category: item.category, contactInfo: item.contact_info });
+    // 设置已有图片
+    const images = item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : [];
+    setEditFileList(images.map((url: string, i: number) => ({ uid: `-${i}`, name: `image-${i}`, status: 'done', url })));
     setEditModalOpen(true);
   };
 
   const handleEditSubmit = async (values: any) => {
     try {
-      await request.put(`/marketplace/${editItem.id}`, values);
-      message.success('更新成功'); setEditModalOpen(false); fetchData();
+      // 先上传新图片
+      const imageUrls: string[] = [];
+      for (const file of editFileList) {
+        if (file.originFileObj) {
+          const formData = new FormData();
+          formData.append('image', file.originFileObj);
+          const resp: any = await request.post('/upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+          if (resp.data?.url) imageUrls.push(resp.data.url);
+        } else if (file.url) {
+          imageUrls.push(file.url);
+        }
+      }
+      await request.put(`/marketplace/${editItem.id}`, { ...values, images: imageUrls.length > 0 ? imageUrls : null });
+      message.success('更新成功'); setEditModalOpen(false); setEditFileList([]); fetchData();
     } catch (err: any) { message.error(err.message); }
   };
 
@@ -70,6 +113,18 @@ export default function MarketList() {
         <Typography.Title level={3}><ShopOutlined /> 二手市场</Typography.Title>
         {isLoggedIn && <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>发布商品</Button>}
       </div>
+      <Space style={{ marginBottom: 16 }} wrap>
+        <Space>
+          <Typography.Text>分类:</Typography.Text>
+          {['', 'textbook', 'electronics', 'daily', 'other'].map(k => (
+            <Tag.CheckableTag key={k} checked={category === k} onChange={() => { setCategory(k); setPage(1); }}>{k ? categoryLabels[k] : '全部'}</Tag.CheckableTag>
+          ))}
+        </Space>
+        <Space>
+          <Typography.Text>排序:</Typography.Text>
+          <Select value={sort} onChange={setSort} options={sortOptions} style={{ width: 120 }} size="small" />
+        </Space>
+      </Space>
       {loading ? <ListSkeleton rows={4} /> : data.length === 0 ? <Empty description="暂无商品" /> : (
         <Row gutter={[16, 16]}>
           {data.map((item: any) => {
@@ -83,7 +138,9 @@ export default function MarketList() {
                     opacity: isSold ? 0.6 : 1,
                     filter: isSold ? 'grayscale(80%)' : 'none',
                     position: 'relative',
+                    cursor: 'pointer',
                   }}
+                  onClick={() => navigate(`/marketplace/${item.id}`)}
                 >
                   {isSold && (
                     <div style={{
@@ -152,6 +209,7 @@ export default function MarketList() {
           </Row>
           <Form.Item name="category" label="分类" rules={[{ required: true }]}><Select options={[{ label: '教材', value: 'textbook' }, { label: '电子产品', value: 'electronics' }, { label: '生活用品', value: 'daily' }, { label: '其他', value: 'other' }]} /></Form.Item>
           <Form.Item name="contactInfo" label="联系方式" rules={[{ required: true, message: '请填写联系方式' }]}><Input placeholder="手机/微信/QQ" /></Form.Item>
+          <Form.Item label="商品图片"><Upload beforeUpload={() => false} fileList={fileList} onChange={({ fileList }) => setFileList(fileList)} listType="picture-card" maxCount={5}><div><UploadOutlined /><div style={{ marginTop: 8 }}>上传图片</div></div></Upload></Form.Item>
         </Form>
       </Modal>
       <Modal title="编辑商品" open={editModalOpen} onCancel={() => setEditModalOpen(false)} onOk={() => editForm.submit()} width={550}>
@@ -165,6 +223,7 @@ export default function MarketList() {
           </Row>
           <Form.Item name="category" label="分类" rules={[{ required: true }]}><Select options={[{ label: '教材', value: 'textbook' }, { label: '电子产品', value: 'electronics' }, { label: '生活用品', value: 'daily' }, { label: '其他', value: 'other' }]} /></Form.Item>
           <Form.Item name="contactInfo" label="联系方式" rules={[{ required: true, message: '请填写联系方式' }]}><Input placeholder="手机/微信/QQ" /></Form.Item>
+          <Form.Item label="商品图片"><Upload beforeUpload={() => false} fileList={editFileList} onChange={({ fileList }) => setEditFileList(fileList)} listType="picture-card" maxCount={5}><div><UploadOutlined /><div style={{ marginTop: 8 }}>上传图片</div></div></Upload></Form.Item>
         </Form>
       </Modal>
     </div>
