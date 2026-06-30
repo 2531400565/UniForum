@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { List, Typography, Tag, Pagination, Card, Button, Tabs, Space, Modal, Form, Input, Select, message, Popconfirm, Upload } from 'antd';
-import { HeartOutlined, PlusOutlined, EnvironmentOutlined, PhoneOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
+import { HeartOutlined, PlusOutlined, EnvironmentOutlined, PhoneOutlined, EditOutlined, DeleteOutlined, UploadOutlined, PictureOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
@@ -15,6 +16,7 @@ const statusConfig: any = {
 const itemCategoryLabels: any = { certificate: '证件', electronics: '电子产品', daily: '日用品', other: '其他' };
 
 export default function LostFoundList() {
+  const navigate = useNavigate();
   const { isLoggedIn, user } = useAuthStore();
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -124,38 +126,48 @@ export default function LostFoundList() {
       </Space>
       {loading ? <ListSkeleton rows={6} /> : (
         <List dataSource={data} renderItem={(item: any) => (
-          <Card style={{ marginBottom: 12 }} hoverable>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Space wrap>
-                <Tag color={item.type === 'lost' ? 'red' : 'green'}>{item.type === 'lost' ? '寻物' : '拾到'}</Tag>
-                <Tag color={statusConfig[item.status]?.color || 'default'}>{statusConfig[item.status]?.label || item.status}</Tag>
-                <Typography.Text strong style={{ fontSize: 16 }}>{item.title}</Typography.Text>
-              </Space>
-              <Space>
-                <Typography.Text type="secondary">{item.item_category}</Typography.Text>
-                <Typography.Text type="secondary">{dayjs(item.created_at).format('MM-DD HH:mm')}</Typography.Text>
-              </Space>
-            </div>
-            <Typography.Paragraph ellipsis={{ rows: 2 }} type="secondary" style={{ marginTop: 8 }}>{item.description}</Typography.Paragraph>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-              <Space size="large">
-                {item.location && <Typography.Text type="secondary"><EnvironmentOutlined /> {item.location}</Typography.Text>}
-                {item.contact_info && <Typography.Text type="secondary"><PhoneOutlined /> {item.contact_info}</Typography.Text>}
-                <Typography.Text type="secondary">发布者: {item.author?.nickname}</Typography.Text>
-              </Space>
-              {isLoggedIn && item.author_id === user?.id && (
-                <Space size="small">
-                  {item.status === 'open' && (
-                    <Button type="primary" size="small" onClick={() => handleStatusChange(item.id, 'resolved')}>
-                      {item.type === 'lost' ? '标记为已找到' : '标记为已归还'}
-                    </Button>
+          <Card style={{ marginBottom: 12, cursor: 'pointer' }} hoverable onClick={() => navigate(`/lost-found/${item.id}`)}>
+            <div style={{ display: 'flex', gap: 12 }}>
+              {item.images && (() => {
+                const images = typeof item.images === 'string' ? JSON.parse(item.images) : item.images;
+                return images && images.length > 0 && (
+                  <img src={images[0]} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+                );
+              })()}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Space wrap>
+                    <Tag color={item.type === 'lost' ? 'red' : 'green'}>{item.type === 'lost' ? '寻物' : '拾到'}</Tag>
+                    <Tag color={statusConfig[item.status]?.color || 'default'}>{statusConfig[item.status]?.label || item.status}</Tag>
+                    <Typography.Text strong style={{ fontSize: 16 }}>{item.title}</Typography.Text>
+                  </Space>
+                  <Space>
+                    <Typography.Text type="secondary">{item.item_category}</Typography.Text>
+                    <Typography.Text type="secondary">{dayjs(item.created_at).format('MM-DD HH:mm')}</Typography.Text>
+                  </Space>
+                </div>
+                <Typography.Paragraph ellipsis={{ rows: 2 }} type="secondary" style={{ marginTop: 4 }}>{item.description}</Typography.Paragraph>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                  <Space size="large">
+                    {item.location && <Typography.Text type="secondary"><EnvironmentOutlined /> {item.location}</Typography.Text>}
+                    {item.contact_info && <Typography.Text type="secondary"><PhoneOutlined /> {item.contact_info}</Typography.Text>}
+                    <Typography.Text type="secondary">发布者: {item.author?.nickname}</Typography.Text>
+                  </Space>
+                  {isLoggedIn && item.author_id === user?.id && (
+                    <Space size="small" onClick={(e) => e.stopPropagation()}>
+                      {item.status === 'open' && (
+                        <Button type="primary" size="small" onClick={() => handleStatusChange(item.id, 'resolved')}>
+                          {item.type === 'lost' ? '标记为已找到' : '标记为已归还'}
+                        </Button>
+                      )}
+                      <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(item)}>编辑</Button>
+                      <Popconfirm title="确定删除该记录？" onConfirm={() => handleDelete(item.id)} okText="删除" cancelText="取消">
+                        <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+                      </Popconfirm>
+                    </Space>
                   )}
-                  <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(item)}>编辑</Button>
-                  <Popconfirm title="确定删除该记录？" onConfirm={() => handleDelete(item.id)} okText="删除" cancelText="取消">
-                    <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
-                  </Popconfirm>
-                </Space>
-              )}
+                </div>
+              </div>
             </div>
           </Card>
         )} />

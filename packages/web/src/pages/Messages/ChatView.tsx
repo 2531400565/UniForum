@@ -103,6 +103,19 @@ export default function ChatView() {
     if (e.ctrlKey && e.key === 'Enter') handleSend();
   };
 
+  // 判断两条消息是否在同一天
+  const isSameDay = (a: string, b: string) => dayjs(a).isSame(dayjs(b), 'day');
+  // 判断是否是今天
+  const isToday = (date: string) => dayjs(date).isSame(dayjs(), 'day');
+  // 判断是否是昨天
+  const isYesterday = (date: string) => dayjs(date).isSame(dayjs().subtract(1, 'day'), 'day');
+  // 格式化日期显示
+  const formatDateLabel = (date: string) => {
+    if (isToday(date)) return '今天';
+    if (isYesterday(date)) return '昨天';
+    return dayjs(date).format('YYYY年M月D日');
+  };
+
   if (loading) return <div style={{ textAlign: 'center', padding: 100 }}><Spin size="large" /></div>;
 
   return (
@@ -119,22 +132,49 @@ export default function ChatView() {
       >
         {/* 消息列表 */}
         <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-          {messages.map((msg: any) => {
+          {messages.map((msg: any, index: number) => {
             const isMe = msg.sender_id === user?.id;
+            const prevMsg = index > 0 ? messages[index - 1] : null;
+            // 是否需要显示日期分隔线：第一条消息 或 与上一条消息不在同一天
+            const showDateDivider = !prevMsg || !isSameDay(prevMsg.created_at, msg.created_at);
+            // 是否是今天之前的最后一条历史消息（今天的第一条消息之前）
+            const isLastHistoryMsg = showDateDivider && isToday(msg.created_at) && prevMsg && !isToday(prevMsg.created_at);
+
             return (
-              <div key={msg.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
-                {!isMe && <Avatar src={msg.sender?.avatar_url} icon={<UserOutlined />} style={{ marginRight: 8, flexShrink: 0 }} />}
-                <div style={{
-                  maxWidth: '70%', padding: '8px 12px', borderRadius: 12,
-                  background: isMe ? '#1677ff' : '#f0f0f0',
-                  color: isMe ? '#fff' : 'inherit',
-                }}>
-                  <div>{msg.content}</div>
-                  <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4, textAlign: 'right' }}>
-                    {dayjs(msg.created_at).format('HH:mm')}
+              <div key={msg.id}>
+                {/* 历史消息分隔线 */}
+                {isLastHistoryMsg && (
+                  <div style={{ textAlign: 'center', margin: '8px 0 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ flex: 1, height: 1, background: '#e8e8e8' }} />
+                      <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>以上为历史消息</Typography.Text>
+                      <div style={{ flex: 1, height: 1, background: '#e8e8e8' }} />
+                    </div>
                   </div>
+                )}
+                {/* 日期分隔线 */}
+                {showDateDivider && (
+                  <div style={{ textAlign: 'center', margin: '16px 0 12px' }}>
+                    <Typography.Text type="secondary" style={{ fontSize: 12, background: '#f5f5f5', padding: '4px 12px', borderRadius: 10 }}>
+                      {formatDateLabel(msg.created_at)}
+                    </Typography.Text>
+                  </div>
+                )}
+                {/* 消息气泡 */}
+                <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
+                  {!isMe && <Avatar src={msg.sender?.avatar_url} icon={<UserOutlined />} style={{ marginRight: 8, flexShrink: 0 }} />}
+                  <div style={{
+                    maxWidth: '70%', padding: '8px 12px', borderRadius: 12,
+                    background: isMe ? '#1677ff' : '#f0f0f0',
+                    color: isMe ? '#fff' : 'inherit',
+                  }}>
+                    <div>{msg.content}</div>
+                    <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4, textAlign: 'right' }}>
+                      {dayjs(msg.created_at).format('HH:mm')}
+                    </div>
+                  </div>
+                  {isMe && <Avatar src={user?.avatarUrl} icon={<UserOutlined />} style={{ marginLeft: 8, flexShrink: 0 }} />}
                 </div>
-                {isMe && <Avatar src={user?.avatarUrl} icon={<UserOutlined />} style={{ marginLeft: 8, flexShrink: 0 }} />}
               </div>
             );
           })}

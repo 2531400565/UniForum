@@ -14,6 +14,7 @@ import * as qaCtrl from '../controllers/qa.controller';
 import * as notificationCtrl from '../controllers/notification.controller';
 import * as tagCtrl from '../controllers/tag.controller';
 import * as messageCtrl from '../controllers/message.controller';
+import * as itemCommentCtrl from '../controllers/itemComment.controller';
 import { auth, optionalAuth } from '../middlewares/auth';
 import { requireRole } from '../middlewares/rbac';
 import { uploadAvatar, uploadImage, uploadResource } from '../middlewares/upload';
@@ -175,5 +176,10 @@ router.get('/conversations/:conversationId', auth, messageCtrl.getConversation);
 router.get('/conversations/:conversationId/messages', auth, messageCtrl.getMessages);
 router.post('/messages', auth, writeLimiter, messageCtrl.sendMessage);
 router.post('/conversations/start', auth, writeLimiter, messageCtrl.startConversation);
+
+// Item Comments (marketplace & lost_found)
+router.get('/item-comments/:targetType/:targetId', optionalAuth, itemCommentCtrl.getComments);
+router.post('/item-comments/:targetType/:targetId', auth, writeLimiter, itemCommentCtrl.createComment);
+router.delete('/item-comments/:id', auth, itemCommentCtrl.deleteComment);
 
 export default router;

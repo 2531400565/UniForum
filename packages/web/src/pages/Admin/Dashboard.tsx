@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Typography, Table, Tag, Button, Space, message, Modal, Form, Input, Select, Tabs } from 'antd';
+import { Card, Row, Col, Typography, Table, Tag, Button, Space, message, Modal, Form, Input, Select, Tabs, Tooltip } from 'antd';
 import { UserOutlined, MessageOutlined, FileTextOutlined, NotificationOutlined, PlusOutlined } from '@ant-design/icons';
 import request from '../../api/request';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 const announcementTypeOptions = [
   { label: '学校通知', value: 'notice' },
@@ -13,6 +14,7 @@ const typeLabels: any = { notice: '学校通知', lecture: '学术讲座', club:
 const typeColors: any = { notice: 'red', lecture: 'blue', club: 'green', other: 'default' };
 
 export default function AdminDashboard() {
+  const { user } = useAuthStore();
   const [stats, setStats] = useState({ users: 0, posts: 0, resources: 0, announcements: 0 });
   const [users, setUsers] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
@@ -73,9 +75,21 @@ export default function AdminDashboard() {
     { title: '院系', dataIndex: 'department' },
     { title: '角色', dataIndex: 'role', render: (r: string) => <Tag color={r === 'admin' ? 'red' : r === 'moderator' ? 'blue' : 'default'}>{r}</Tag> },
     { title: '状态', dataIndex: 'status', render: (s: string) => <Tag color={s === 'active' ? 'green' : 'red'}>{s}</Tag> },
-    { title: '操作', render: (_: any, record: any) => (
-      <Space>{record.status === 'active' ? <Button size="small" danger onClick={() => handleUserStatus(record.id, 'banned')}>封禁</Button> : <Button size="small" type="primary" onClick={() => handleUserStatus(record.id, 'active')}>解封</Button>}</Space>
-    )},
+    { title: '操作', render: (_: any, record: any) => {
+      const isSelf = record.id === user?.id;
+      const isAdmin = record.role === 'admin';
+      const canBan = !isSelf && !isAdmin;
+      const tooltipText = isSelf ? '不能封禁自己' : isAdmin ? '不能封禁管理员' : '';
+      return (
+        <Space>
+          {record.status === 'active' ? (
+            <Tooltip title={tooltipText}><Button size="small" danger disabled={!canBan} onClick={() => handleUserStatus(record.id, 'banned')}>封禁</Button></Tooltip>
+          ) : (
+            <Button size="small" type="primary" onClick={() => handleUserStatus(record.id, 'active')}>解封</Button>
+          )}
+        </Space>
+      );
+    }},
   ];
 
   const resourceColumns = [

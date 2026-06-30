@@ -1,7 +1,7 @@
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConfigProvider, theme } from 'antd';
+import { ConfigProvider, theme, App as AntApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import App from './App';
 import './styles/global.css';
@@ -24,17 +24,19 @@ function Root() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ConfigProvider
-          locale={zhCN}
-          theme={{
-            algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
-            token: { colorPrimary: '#1677ff' },
-          }}
-        >
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </ConfigProvider>
+        <AntApp>
+          <ConfigProvider
+            locale={zhCN}
+            theme={{
+              algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
+              token: { colorPrimary: '#1677ff' },
+            }}
+          >
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </ConfigProvider>
+        </AntApp>
       </QueryClientProvider>
     </ErrorBoundary>
   );

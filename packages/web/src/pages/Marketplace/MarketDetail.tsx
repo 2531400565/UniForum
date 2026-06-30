@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Card, Typography, Avatar, Tag, Space, Button, message, Spin, Popconfirm, Modal, Form, Input, Select, InputNumber, Row, Col } from 'antd';
+import { Card, Typography, Avatar, Tag, Space, Button, message, Spin, Popconfirm, Modal, Form, Input, Select, InputNumber, Row, Col, Upload } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
-import { UserOutlined, PhoneOutlined, DeleteOutlined, CheckCircleOutlined, EditOutlined } from '@ant-design/icons';
+import { UserOutlined, PhoneOutlined, DeleteOutlined, CheckCircleOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
+import ItemComment from '../../components/ItemComment';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -20,6 +21,7 @@ export default function MarketDetail() {
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm] = Form.useForm();
+  const [editFileList, setEditFileList] = useState<any[]>([]);
 
   const fetchItem = () => {
     request.get(`/marketplace/${id}`).then((res: any) => setItem(res.data)).catch(() => message.error('加载失败')).finally(() => setLoading(false));
@@ -45,14 +47,30 @@ export default function MarketDetail() {
 
   const handleEdit = () => {
     editForm.setFieldsValue({ title: item.title, description: item.description, price: item.price, originalPrice: item.original_price, conditionLevel: item.condition_level, category: item.category, contactInfo: item.contact_info });
+    // 设置已有图片
+    const images = item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : [];
+    setEditFileList(images.map((url: string, i: number) => ({ uid: `-${i}`, name: `image-${i}`, status: 'done', url })));
     setEditModalOpen(true);
   };
 
   const handleEditSubmit = async (values: any) => {
     try {
-      await request.put(`/marketplace/${id}`, values);
+      // 先上传新图片
+      const imageUrls: string[] = [];
+      for (const file of editFileList) {
+        if (file.originFileObj) {
+          const formData = new FormData();
+          formData.append('image', file.originFileObj);
+          const resp: any = await request.post('/upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+          if (resp.data?.url) imageUrls.push(resp.data.url);
+        } else if (file.url) {
+          imageUrls.push(file.url);
+        }
+      }
+      await request.put(`/marketplace/${id}`, { ...values, images: imageUrls.length > 0 ? imageUrls : null });
       message.success('更新成功');
       setEditModalOpen(false);
+      setEditFileList([]);
       fetchItem();
     } catch (err: any) { message.error(err.message); }
   };
@@ -116,6 +134,10 @@ export default function MarketDetail() {
       </Card>
       <Button style={{ marginTop: 16 }} onClick={() => navigate('/marketplace')}>返回列表</Button>
 
+      <Card style={{ marginTop: 16 }}>
+        <ItemComment targetType="marketplace" targetId={parseInt(id || '0')} />
+      </Card>
+
       <Modal title="编辑商品" open={editModalOpen} onCancel={() => setEditModalOpen(false)} onOk={() => editForm.submit()} width={550}>
         <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
           <Form.Item name="title" label="商品名称" rules={[{ required: true }]}><Input /></Form.Item>
@@ -127,6 +149,7 @@ export default function MarketDetail() {
           </Row>
           <Form.Item name="category" label="分类" rules={[{ required: true }]}><Select options={[{ label: '教材', value: 'textbook' }, { label: '电子产品', value: 'electronics' }, { label: '生活用品', value: 'daily' }, { label: '其他', value: 'other' }]} /></Form.Item>
           <Form.Item name="contactInfo" label="联系方式" rules={[{ required: true, message: '请填写联系方式' }]}><Input placeholder="手机/微信/QQ" /></Form.Item>
+          <Form.Item label="商品图片"><Upload beforeUpload={() => false} fileList={editFileList} onChange={({ fileList }) => setEditFileList(fileList)} listType="picture-card" maxCount={5}><div><UploadOutlined /><div style={{ marginTop: 8 }}>上传图片</div></div></Upload></Form.Item>
         </Form>
       </Modal>
     </div>

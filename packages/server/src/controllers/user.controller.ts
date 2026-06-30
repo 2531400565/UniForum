@@ -137,8 +137,12 @@ export async function updateUserRole(req: AuthRequest, res: Response) {
 
 export async function updateUserStatus(req: AuthRequest, res: Response) {
   try {
-    const user = await User.findByPk(parseInt(req.params.id));
+    const targetId = parseInt(req.params.id);
+    if (targetId === req.userId) return fail(res, '不能封禁/解封自己', 400);
+    const user = await User.findByPk(targetId);
     if (!user) return fail(res, '用户不存在', 404);
+    // 不能封禁其他管理员
+    if (user.role === 'admin') return fail(res, '不能封禁管理员', 400);
     const { status } = req.body;
     if (!['active', 'banned'].includes(status)) return fail(res, '无效状态');
     user.status = status;

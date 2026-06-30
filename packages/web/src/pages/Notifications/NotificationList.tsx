@@ -71,7 +71,7 @@ export default function NotificationList() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>
                         <Typography.Text strong>{item.sender?.nickname}</Typography.Text>
-                        {item.type === 'message' ? getNotifTypeLabel(item) : `${getNotifTypeLabel(item)}了你`}
+                        {item.type === 'message' ? getNotifTypeLabel(item) : (item.target_type === 'marketplace' || item.target_type === 'lost_found') ? getNotifTypeLabel(item) : `${getNotifTypeLabel(item)}了你`}
                       </span>
                       {!item.is_read && <Badge status="processing" text="未读" />}
                     </div>

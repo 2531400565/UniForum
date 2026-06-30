@@ -612,6 +612,43 @@ Message.init({
   is_read: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, { sequelize, tableName: 'messages', indexes: [{ fields: ['conversation_id', 'created_at'] }] });
 
+// ============ ItemComment ============
+interface ItemCommentAttributes {
+  id: number;
+  content: string;
+  target_type: 'marketplace' | 'lost_found';
+  target_id: number;
+  author_id: number;
+  parent_id: number | null;
+  reply_to_id: number | null;
+  status: 'active' | 'deleted';
+}
+
+export class ItemComment extends Model<ItemCommentAttributes, Optional<ItemCommentAttributes, 'id' | 'parent_id' | 'reply_to_id' | 'status'>> implements ItemCommentAttributes {
+  declare id: number;
+  declare content: string;
+  declare target_type: 'marketplace' | 'lost_found';
+  declare target_id: number;
+  declare author_id: number;
+  declare parent_id: number | null;
+  declare reply_to_id: number | null;
+  declare status: 'active' | 'deleted';
+  declare readonly created_at: Date;
+  declare readonly updated_at: Date;
+  declare replies?: ItemComment[];
+}
+
+ItemComment.init({
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  content: { type: DataTypes.TEXT, allowNull: false },
+  target_type: { type: DataTypes.ENUM('marketplace', 'lost_found'), allowNull: false },
+  target_id: { type: DataTypes.INTEGER, allowNull: false },
+  author_id: { type: DataTypes.INTEGER, allowNull: false },
+  parent_id: { type: DataTypes.INTEGER, allowNull: true },
+  reply_to_id: { type: DataTypes.INTEGER, allowNull: true },
+  status: { type: DataTypes.ENUM('active', 'deleted'), defaultValue: 'active' },
+}, { sequelize, tableName: 'item_comments', indexes: [{ fields: ['target_type', 'target_id'] }, { fields: ['parent_id'] }] });
+
 // ============ Associations ============
 // Board
 Board.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
@@ -687,5 +724,11 @@ Following.belongsTo(User, { foreignKey: 'following_id', as: 'followingUser' });
 Message.belongsTo(Conversation, { foreignKey: 'conversation_id', as: 'conversation' });
 Message.belongsTo(User, { foreignKey: 'sender_id', as: 'sender' });
 Conversation.hasMany(Message, { foreignKey: 'conversation_id', as: 'messages' });
+
+// ItemComment
+ItemComment.belongsTo(User, { foreignKey: 'author_id', as: 'author' });
+ItemComment.belongsTo(ItemComment, { foreignKey: 'parent_id', as: 'parent' });
+ItemComment.hasMany(ItemComment, { foreignKey: 'parent_id', as: 'replies' });
+ItemComment.belongsTo(User, { foreignKey: 'reply_to_id', as: 'replyTo' });
 
 export { sequelize };

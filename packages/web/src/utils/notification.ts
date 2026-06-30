@@ -8,6 +8,8 @@ export function getNotificationLink(n: any): string {
   if (n.target_type === 'question') return `/qa/${n.target_id}`;
   if (n.target_type === 'post') return `/forum/post/${n.target_id}`;
   if (n.target_type === 'user') return `/profile/${n.target_id}`;
+  if (n.target_type === 'marketplace') return `/marketplace/${n.target_id}`;
+  if (n.target_type === 'lost_found') return `/lost-found/${n.target_id}`;
   // Fallback: 旧通知无 target_type，按 type 推断（adopt 必须在 comment 之前）
   if (n.type === 'adopt') return `/qa/${n.target_id}`;
   if (n.type === 'message') return `/messages`;
@@ -18,5 +20,9 @@ export function getNotificationLink(n: any): string {
 export function getNotifTypeLabel(n: any): string {
   if (n.target_type === 'question' && n.type === 'comment') return '回答';
   if (n.target_type === 'user') return '关注';
+  if (n.target_type === 'marketplace' && n.type === 'comment') return '评论了二手市场商品';
+  if (n.target_type === 'lost_found' && n.type === 'comment') return '评论了失物招领';
+  if (n.target_type === 'marketplace' && n.type === 'reply') return '在二手市场回复了评论';
+  if (n.target_type === 'lost_found' && n.type === 'reply') return '在失物招领回复了评论';
   return typeLabels[n.type] || n.type;
 }

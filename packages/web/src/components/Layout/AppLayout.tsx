@@ -159,7 +159,7 @@ export default function AppLayout() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={{ fontSize: 13 }}>
                       <Text strong style={{ fontSize: 13 }}>{item.sender?.nickname}</Text>
-                      {' '}{item.type === 'message' ? getNotifTypeLabel(item) : `${getNotifTypeLabel(item)}了你`}
+                      {' '}{item.type === 'message' ? getNotifTypeLabel(item) : (item.target_type === 'marketplace' || item.target_type === 'lost_found') ? getNotifTypeLabel(item) : `${getNotifTypeLabel(item)}了你`}
                     </Text>
                     {!item.is_read && <Badge status="processing" />}
                   </div>

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Card, Typography, Avatar, Tag, Space, Button, message, Spin, Popconfirm, Modal, Form, Input, Select } from 'antd';
+import { Card, Typography, Avatar, Tag, Space, Button, message, Spin, Popconfirm, Modal, Form, Input, Select, Upload } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
-import { UserOutlined, EnvironmentOutlined, PhoneOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { UserOutlined, EnvironmentOutlined, PhoneOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
+import ItemComment from '../../components/ItemComment';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -22,6 +23,7 @@ export default function LostFoundDetail() {
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm] = Form.useForm();
+  const [editFileList, setEditFileList] = useState<any[]>([]);
 
   const fetchItem = () => {
     request.get(`/lost-found/${id}`).then((res: any) => setItem(res.data)).catch(() => message.error('加载失败')).finally(() => setLoading(false));
@@ -47,14 +49,30 @@ export default function LostFoundDetail() {
 
   const handleEdit = () => {
     editForm.setFieldsValue({ title: item.title, description: item.description, location: item.location, contactInfo: item.contact_info });
+    // 设置已有图片
+    const images = item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : [];
+    setEditFileList(images.map((url: string, i: number) => ({ uid: `-${i}`, name: `image-${i}`, status: 'done', url })));
     setEditModalOpen(true);
   };
 
   const handleEditSubmit = async (values: any) => {
     try {
-      await request.put(`/lost-found/${id}`, values);
+      // 先上传新图片
+      const imageUrls: string[] = [];
+      for (const file of editFileList) {
+        if (file.originFileObj) {
+          const formData = new FormData();
+          formData.append('image', file.originFileObj);
+          const resp: any = await request.post('/upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+          if (resp.data?.url) imageUrls.push(resp.data.url);
+        } else if (file.url) {
+          imageUrls.push(file.url);
+        }
+      }
+      await request.put(`/lost-found/${id}`, { ...values, images: imageUrls.length > 0 ? imageUrls : null });
       message.success('更新成功');
       setEditModalOpen(false);
+      setEditFileList([]);
       fetchItem();
     } catch (err: any) { message.error(err.message); }
   };
@@ -114,12 +132,17 @@ export default function LostFoundDetail() {
       </Card>
       <Button style={{ marginTop: 16 }} onClick={() => navigate('/lost-found')}>返回列表</Button>
 
+      <Card style={{ marginTop: 16 }}>
+        <ItemComment targetType="lost_found" targetId={parseInt(id || '0')} />
+      </Card>
+
       <Modal title="编辑失物招领" open={editModalOpen} onCancel={() => setEditModalOpen(false)} onOk={() => editForm.submit()} width={500}>
         <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
           <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="description" label="描述" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item>
           <Form.Item name="location" label="地点"><Input /></Form.Item>
           <Form.Item name="contactInfo" label="联系方式"><Input /></Form.Item>
+          <Form.Item label="图片"><Upload beforeUpload={() => false} fileList={editFileList} onChange={({ fileList }) => setEditFileList(fileList)} listType="picture-card" maxCount={5}><div><UploadOutlined /><div style={{ marginTop: 8 }}>上传图片</div></div></Upload></Form.Item>
         </Form>
       </Modal>
     </div>

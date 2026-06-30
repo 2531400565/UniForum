@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card, Typography, Avatar, Button, Space, Input, List, message, Tag, Divider, Popconfirm } from 'antd';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { LikeOutlined, LikeFilled, EyeOutlined, MessageOutlined, UserOutlined, StarOutlined, StarFilled, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { LikeOutlined, LikeFilled, EyeOutlined, MessageOutlined, UserOutlined, StarOutlined, StarFilled, EditOutlined, DeleteOutlined, CommentOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { io, Socket } from 'socket.io-client';
@@ -23,6 +23,7 @@ export default function PostDetail() {
   const [commentPage, setCommentPage] = useState(1);
   const [commentTotal, setCommentTotal] = useState(0);
   const [commentLoading, setCommentLoading] = useState(false);
+  const [replyTo, setReplyTo] = useState<any>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const fetchPost = () => {
@@ -34,7 +35,7 @@ export default function PostDetail() {
     setCommentLoading(true);
     request.get(`/posts/${id}/comments`, { params: { page, pageSize: 10 } })
       .then((res: any) => {
-        const newList = res.data?.list || [];
+        const newList = (res.data?.list || []).map((c: any) => ({ ...c, _rootId: c.id }));
         setComments(prev => page === 1 ? newList : [...prev, ...newList]);
         setCommentTotal(res.data?.total || 0);
         setCommentPage(page);
@@ -111,9 +112,14 @@ export default function PostDetail() {
   const handleComment = async () => {
     if (!commentText.trim()) return;
     try {
-      await request.post(`/posts/${id}/comments`, { content: commentText });
-      message.success('评论成功');
+      await request.post(`/posts/${id}/comments`, {
+        content: commentText,
+        parentId: replyTo?._rootId || replyTo?.parentId,
+        replyToId: replyTo?.author?.id,
+      });
+      message.success(replyTo ? '回复成功' : '评论成功');
       setCommentText('');
+      setReplyTo(null);
       fetchPost();
     } catch (err: any) { message.error(err.message); }
   };
@@ -220,8 +226,14 @@ export default function PostDetail() {
       <Card title={`评论 (${post.comment_count})`} style={{ marginTop: 16 }}>
         {isLoggedIn && (
           <div style={{ marginBottom: 16 }}>
-            <TextArea rows={3} value={commentText} onChange={e => setCommentText(e.target.value)} onKeyDown={handleCommentKeyDown} placeholder="写下你的评论... (Ctrl+Enter 发布)" />
-            <Button type="primary" style={{ marginTop: 8 }} onClick={handleComment} disabled={!commentText.trim()}>提交评论</Button>
+            {replyTo && (
+              <div style={{ marginBottom: 8, padding: '8px 12px', background: '#f0f5ff', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text type="secondary"><CommentOutlined /> 回复 {replyTo.author?.nickname}：{replyTo.content?.substring(0, 30)}{replyTo.content?.length > 30 ? '...' : ''}</Text>
+                <Button type="link" size="small" onClick={() => setReplyTo(null)}>取消回复</Button>
+              </div>
+            )}
+            <TextArea rows={3} value={commentText} onChange={e => setCommentText(e.target.value)} onKeyDown={handleCommentKeyDown} placeholder={replyTo ? `回复 ${replyTo.author?.nickname}...` : "写下你的评论... (Ctrl+Enter 发布)"} />
+            <Button type="primary" style={{ marginTop: 8 }} onClick={handleComment} disabled={!commentText.trim()}>{replyTo ? '回复' : '提交评论'}</Button>
           </div>
         )}
         <List
@@ -238,6 +250,9 @@ export default function PostDetail() {
                 />
                 <div style={{ marginLeft: 48, marginTop: 4 }}>
                   <Button size="small" type="text" icon={item.isLiked ? <LikeFilled style={{ color: '#1677ff' }} /> : <LikeOutlined />} onClick={() => handleCommentLike(item.id, item.isLiked)}>{item.like_count || 0}</Button>
+                  {isLoggedIn && (
+                    <Button size="small" type="text" icon={<CommentOutlined />} onClick={() => setReplyTo({ _rootId: item._rootId || item.id, parentId: item.id, author: item.author, content: item.content })} style={{ marginLeft: 8 }}>回复</Button>
+                  )}
                   {(user?.id === item.author?.id || isAdmin) && (
                     <Popconfirm title="确定删除该评论？" onConfirm={() => handleDeleteComment(item.id)} okText="删除" cancelText="取消">
                       <Button size="small" type="text" danger icon={<DeleteOutlined />} style={{ marginLeft: 8 }}>删除</Button>
@@ -246,10 +261,17 @@ export default function PostDetail() {
                 </div>
                 {item.replies?.map((r: any) => (
                   <div key={r.id} style={{ marginLeft: 48, marginTop: 8, padding: '8px 12px', background: '#f9f9f9', borderRadius: 6 }}>
-                    <Space><Text strong>{r.author?.nickname}</Text><Text type="secondary">{dayjs(r.created_at).format('MM-DD HH:mm')}</Text></Space>
+                    <Space>
+                      <Text strong>{r.author?.nickname}</Text>
+                      {r.replyTo && <Text type="secondary">回复 {r.replyTo.nickname}</Text>}
+                      <Text type="secondary">{dayjs(r.created_at).format('MM-DD HH:mm')}</Text>
+                    </Space>
                     <div>{r.content}</div>
                     <div style={{ marginTop: 4 }}>
                       <Button size="small" type="text" icon={r.isLiked ? <LikeFilled style={{ color: '#1677ff' }} /> : <LikeOutlined />} onClick={() => handleCommentLike(r.id, r.isLiked)}>{r.like_count || 0}</Button>
+                      {isLoggedIn && (
+                        <Button size="small" type="text" icon={<CommentOutlined />} onClick={() => setReplyTo({ _rootId: item._rootId || item.id, parentId: item.id, author: r.author, content: r.content })} style={{ marginLeft: 8 }}>回复</Button>
+                      )}
                       {(user?.id === r.author?.id || isAdmin) && (
                         <Popconfirm title="确定删除该回复？" onConfirm={() => handleDeleteComment(r.id)} okText="删除" cancelText="取消">
                           <Button size="small" type="text" danger icon={<DeleteOutlined />} style={{ marginLeft: 8 }}>删除</Button>
