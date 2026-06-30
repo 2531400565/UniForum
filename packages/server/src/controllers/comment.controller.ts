@@ -4,6 +4,8 @@ import { Op } from 'sequelize';
 import { success, fail } from '../utils/response';
 import { AuthRequest } from '../middlewares/auth';
 import { getPagination, paginatedResult } from '../utils/pagination';
+import { sanitizeText } from '../utils/sanitize';
+import { pushNotification, getIO } from '../services/socketService';
 
 export async function getComments(req: AuthRequest, res: Response) {
   try {
@@ -20,7 +22,7 @@ export async function getComments(req: AuthRequest, res: Response) {
     });
 
     // Check if current user liked each comment
-    const commentIds = rows.flatMap(c => [c.id, ...c.replies.map((r: any) => r.id)]);
+    const commentIds = rows.flatMap(c => [c.id, ...(c.replies || []).map((r: any) => r.id)]);
     const likedIds = req.userId ? new Set((await CommentLike.findAll({ where: { user_id: req.userId, comment_id: { [Op.in]: commentIds } } })).map(l => l.comment_id)) : new Set<number>();
     const data = paginatedResult(rows.map(c => {
       const comment = c.toJSON() as any;
@@ -44,8 +46,11 @@ export async function createComment(req: AuthRequest, res: Response) {
     const { content, parentId, replyToId } = req.body;
     if (!content) return fail(res, '评论内容不能为空');
 
+    // XSS 净化
+    const safeContent = sanitizeText(content);
+
     const comment = await Comment.create({
-      content, post_id: postId, author_id: req.userId!,
+      content: safeContent, post_id: postId, author_id: req.userId!,
       parent_id: parentId || null, reply_to_id: replyToId || null,
     });
 
@@ -55,15 +60,31 @@ export async function createComment(req: AuthRequest, res: Response) {
       include: [{ model: User, as: 'author', attributes: ['id', 'nickname', 'avatar_url'] }],
     });
 
-    // Notification
-    const notifyUserId = replyToId || post.author_id;
+    // Notification — 确定通知接收者
+    let notifyUserId: number | undefined;
+    if (replyToId) {
+      notifyUserId = replyToId;
+    } else if (parentId) {
+      // 回复评论但未指定 replyToId，通知父评论作者
+      const parent = await Comment.findByPk(parentId);
+      notifyUserId = parent?.author_id;
+    }
+    if (!notifyUserId) notifyUserId = post.author_id;
+
     if (notifyUserId !== req.userId) {
-      await Notification.create({
+      const notif = await Notification.create({
         user_id: notifyUserId, sender_id: req.userId,
         type: parentId ? 'reply' : 'comment',
         title: parentId ? '有人回复了你的评论' : '有人评论了你的帖子',
         target_type: 'post', target_id: postId,
       });
+      pushNotification(notifyUserId, notif);
+    }
+
+    // 向正在查看此帖子的用户广播新评论
+    const io = getIO();
+    if (io && created) {
+      io.to(`post:${postId}`).emit('newComment', { postId, comment: created.toJSON() });
     }
 
     return success(res, created, '评论成功', 201);
@@ -81,11 +102,25 @@ export async function deleteComment(req: AuthRequest, res: Response) {
       return fail(res, '无权删除', 403);
     }
 
+    // 统计需要删除的评论数（自身 + 子评论）
+    let deleteCount = 1;
+    if (!comment.parent_id) {
+      // 一级评论：同时软删除所有子评论
+      const replyCount = await Comment.count({ where: { parent_id: comment.id, status: 'active' } });
+      deleteCount += replyCount;
+      await Comment.update({ status: 'deleted' }, { where: { parent_id: comment.id, status: 'active' } });
+    }
+
     comment.status = 'deleted';
     await comment.save();
 
+    // 递减评论数
     const post = await Post.findByPk(comment.post_id);
-    if (post && post.comment_count > 0) await post.decrement('comment_count');
+    if (post && post.comment_count >= deleteCount) {
+      await post.decrement('comment_count', { by: deleteCount });
+    } else if (post && post.comment_count > 0) {
+      await post.update({ comment_count: 0 });
+    }
 
     return success(res, null, '删除成功');
   } catch (error: any) {

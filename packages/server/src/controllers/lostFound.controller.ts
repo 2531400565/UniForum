@@ -4,12 +4,15 @@ import { LostAndFound, User } from '../models';
 import { success, fail } from '../utils/response';
 import { AuthRequest } from '../middlewares/auth';
 import { getPagination, paginatedResult } from '../utils/pagination';
+import { sanitizeText } from '../utils/sanitize';
 
 export async function getList(req: AuthRequest, res: Response) {
   try {
     const { limit, offset, page, pageSize } = getPagination(req.query.page, req.query.pageSize);
     const { type, status, keyword } = req.query;
-    const where: any = { status: status || 'open' };
+    const where: any = {};
+    if (status && status !== 'all') where.status = status;
+    else if (!status) where.status = 'open';
     if (type) where.type = type;
     if (keyword) where.title = { [Op.like]: `%${keyword}%` };
     const { count, rows } = await LostAndFound.findAndCountAll({
@@ -33,7 +36,7 @@ export async function create(req: AuthRequest, res: Response) {
     const { title, description, type, itemCategory, location, lostTime, images, contactInfo } = req.body;
     if (!title || !description || !type || !itemCategory) return fail(res, '必填字段不能为空');
     const item = await LostAndFound.create({
-      title, description, type, item_category: itemCategory,
+      title: sanitizeText(title), description: sanitizeText(description), type, item_category: itemCategory,
       location: location || null, lost_time: lostTime || null,
       images: images ? JSON.stringify(images) : null,
       contact_info: contactInfo || null, author_id: req.userId!,
@@ -48,8 +51,8 @@ export async function update(req: AuthRequest, res: Response) {
     if (!item) return fail(res, '记录不存在', 404);
     if (item.author_id !== req.userId && req.userRole !== 'admin') return fail(res, '无权修改', 403);
     const { title, description, location, contactInfo, images } = req.body;
-    if (title) item.title = title;
-    if (description) item.description = description;
+    if (title) item.title = sanitizeText(title);
+    if (description) item.description = sanitizeText(description);
     if (location !== undefined) item.location = location;
     if (contactInfo !== undefined) item.contact_info = contactInfo;
     if (images) item.images = JSON.stringify(images);

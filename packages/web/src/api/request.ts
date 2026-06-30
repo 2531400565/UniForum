@@ -8,14 +8,64 @@ request.interceptors.request.use((config) => {
   return config;
 });
 
+// Token 刷新锁，防止并发刷新
+let isRefreshing = false;
+let refreshQueue: ((token: string | null) => void)[] = [];
+
 request.interceptors.response.use(
   (res) => res.data,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      window.location.href = '/login';
+  async (err) => {
+    const originalRequest = err.config;
+
+    // 401 且非刷新请求且未重试过
+    if (err.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
+      // 如果正在刷新，排队等待
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          refreshQueue.push((token) => {
+            if (token) {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              resolve(request(originalRequest));
+            } else {
+              reject(err.response?.data || err);
+            }
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) throw new Error('no refresh token');
+
+        const res = await axios.post('/api/v1/auth/refresh', { refreshToken });
+        const { accessToken, refreshToken: newRefreshToken } = res.data.data;
+
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', newRefreshToken);
+
+        // 通知队列中的请求
+        refreshQueue.forEach((cb) => cb(accessToken));
+        refreshQueue = [];
+
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return request(originalRequest);
+      } catch {
+        // 刷新失败，清除登录状态
+        refreshQueue.forEach((cb) => cb(null));
+        refreshQueue = [];
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        return Promise.reject(err.response?.data || err);
+      } finally {
+        isRefreshing = false;
+      }
     }
+
     return Promise.reject(err.response?.data || err);
   }
 );

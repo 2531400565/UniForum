@@ -7,8 +7,8 @@ import { config } from '../config';
 import { AuthRequest } from '../middlewares/auth';
 
 function generateTokens(user: { id: number; role: string }) {
-  const accessToken = jwt.sign({ userId: user.id, role: user.role }, config.jwt.secret, { expiresIn: config.jwt.accessTokenExpiry });
-  const refreshToken = jwt.sign({ userId: user.id, role: user.role }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshTokenExpiry });
+  const accessToken = jwt.sign({ userId: user.id, role: user.role }, config.jwt.secret as jwt.Secret, { expiresIn: config.jwt.accessTokenExpiry } as jwt.SignOptions);
+  const refreshToken = jwt.sign({ userId: user.id, role: user.role }, config.jwt.refreshSecret as jwt.Secret, { expiresIn: config.jwt.refreshTokenExpiry } as jwt.SignOptions);
   return { accessToken, refreshToken };
 }
 
@@ -17,6 +17,9 @@ export async function register(req: Request, res: Response) {
     const { email, password, nickname, studentId, department, grade } = req.body;
     if (!email || !password || !nickname) {
       return fail(res, '邮箱、密码和昵称为必填项');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return fail(res, '邮箱格式不正确');
     }
     if (password.length < 6) {
       return fail(res, '密码长度至少6位');

@@ -21,10 +21,10 @@ export default function AdminDashboard() {
   const [annForm] = Form.useForm();
 
   const fetchAll = () => {
-    request.get('/posts', { params: { pageSize: 1 } }).then((res: any) => setStats(s => ({ ...s, posts: res.data?.total || 0 })));
+    request.get('/posts', { params: { pageSize: 1 } }).then((res: any) => setStats(s => ({ ...s, posts: res.data?.total || 0 }))).catch(() => {});
     request.get('/users', { params: { pageSize: 1 } }).then((res: any) => setStats(s => ({ ...s, users: res.data?.total || 0 }))).catch(() => {});
-    request.get('/resources', { params: { pageSize: 1, status: 'pending' } }).then((res: any) => setStats(s => ({ ...s, resources: res.data?.total || 0 })));
-    request.get('/announcements', { params: { pageSize: 1 } }).then((res: any) => setStats(s => ({ ...s, announcements: res.data?.total || 0 })));
+    request.get('/resources', { params: { pageSize: 1, status: 'pending' } }).then((res: any) => setStats(s => ({ ...s, resources: res.data?.total || 0 }))).catch(() => {});
+    request.get('/announcements', { params: { pageSize: 1 } }).then((res: any) => setStats(s => ({ ...s, announcements: res.data?.total || 0 }))).catch(() => {});
     request.get('/users', { params: { pageSize: 50 } }).then((res: any) => setUsers(res.data?.list || [])).catch(() => {});
     request.get('/resources', { params: { pageSize: 50, status: 'pending' } }).then((res: any) => setResources(res.data?.list || [])).catch(() => {});
     request.get('/announcements', { params: { pageSize: 50, showAll: 'true' } }).then((res: any) => setAnnouncements(res.data?.list || [])).catch(() => {});

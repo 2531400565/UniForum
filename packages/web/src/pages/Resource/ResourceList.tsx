@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { List, Typography, Tag, Pagination, Spin, Card, Button, Rate, Space, Upload, Modal, Form, Input, Select, message } from 'antd';
+import { List, Typography, Tag, Pagination, Card, Button, Rate, Space, Upload, Modal, Form, Input, Select, message } from 'antd';
 import { FileTextOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
+import { ListSkeleton } from '../../components/Skeleton';
 
 const categoryLabels: any = { slides: '课件', notes: '笔记', booklist: '书单', exam: '试题', other: '其他' };
 
@@ -51,7 +52,7 @@ export default function ResourceList() {
           <Tag.CheckableTag key={k} checked={category === k} onChange={() => { setCategory(k); setPage(1); }}>{k ? categoryLabels[k] : '全部'}</Tag.CheckableTag>
         ))}
       </Space>
-      {loading ? <div style={{ textAlign: 'center', padding: 50 }}><Spin /></div> : (
+      {loading ? <ListSkeleton rows={6} /> : (
         <List dataSource={data} renderItem={(item: any) => (
           <Card style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Card, Typography, Avatar, Button, Space, Input, List, message, Spin, Tag, Divider } from 'antd';
-import { useParams } from 'react-router-dom';
-import { UserOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Card, Typography, Avatar, Button, Space, Input, List, message, Tag, Divider, Popconfirm } from 'antd';
+import { useParams, useNavigate } from 'react-router-dom';
+import { UserOutlined, CheckCircleOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
+import { PostDetailSkeleton } from '../../components/Skeleton';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -12,6 +13,7 @@ const { TextArea } = Input;
 export default function QuestionDetail() {
   const { id } = useParams();
   const { user, isLoggedIn } = useAuthStore();
+  const navigate = useNavigate();
   const [question, setQuestion] = useState<any>(null);
   const [answerText, setAnswerText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -37,14 +39,40 @@ export default function QuestionDetail() {
     } catch (err: any) { message.error(err.message); }
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 100 }}><Spin size="large" /></div>;
+  const handleDeleteAnswer = async (answerId: number) => {
+    try {
+      await request.delete(`/qa/answers/${answerId}`);
+      message.success('删除成功'); fetchQuestion();
+    } catch (err: any) { message.error(err.message); }
+  };
+
+  const handleDeleteQuestion = async () => {
+    try {
+      await request.delete(`/qa/questions/${id}`);
+      message.success('删除成功'); navigate('/qa');
+    } catch (err: any) { message.error(err.message); }
+  };
+
+  if (loading) return <PostDetailSkeleton />;
   if (!question) return <div style={{ textAlign: 'center', padding: 100 }}>问题不存在</div>;
+
+  const isQuestionAuthor = user?.id === question?.author_id;
 
   return (
     <div className="page-container" style={{ maxWidth: 800 }}>
       <Card>
-        <Space style={{ marginBottom: 8 }}><Tag color={question.status === 'resolved' ? 'green' : 'orange'}>{question.status === 'resolved' ? '已解决' : '待解答'}</Tag>
-          <Tag>{question.category}</Tag></Space>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Space><Tag color={question.status === 'resolved' ? 'green' : 'orange'}>{question.status === 'resolved' ? '已解决' : '待解答'}</Tag>
+            <Tag>{question.category}</Tag></Space>
+          {isQuestionAuthor && (
+            <Space size="small">
+              <Button size="small" icon={<EditOutlined />} onClick={() => message.info('编辑功能开发中')}>编辑</Button>
+              <Popconfirm title="确定删除该问题？" onConfirm={handleDeleteQuestion} okText="删除" cancelText="取消">
+                <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+              </Popconfirm>
+            </Space>
+          )}
+        </div>
         <Title level={3}>{question.title}</Title>
         <Space style={{ marginBottom: 16 }}>
           <Avatar src={question.author?.avatar_url} icon={<UserOutlined />} size="small" />
@@ -73,6 +101,11 @@ export default function QuestionDetail() {
             />
             {question.author_id === user?.id && !item.is_accepted && (
               <Button size="small" type="link" onClick={() => handleAccept(item.id)}>采纳</Button>
+            )}
+            {(item.author_id === user?.id || user?.role === 'admin') && (
+              <Popconfirm title="确定删除该回答？" onConfirm={() => handleDeleteAnswer(item.id)} okText="删除" cancelText="取消">
+                <Button size="small" type="text" danger icon={<DeleteOutlined />}>删除</Button>
+              </Popconfirm>
             )}
           </List.Item>
         )} />

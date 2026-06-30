@@ -1,9 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import routes from './routes';
 import { errorHandler } from './middlewares/errorHandler';
+import { globalLimiter } from './middlewares/rateLimiter';
 import { config } from './config';
 
 const app = express();
@@ -15,12 +17,20 @@ const uploadsDir = path.resolve(__dirname, '../uploads');
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 });
 
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: config.clientUrl, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// 全局限流
+app.use('/api/v1', globalLimiter);
 
 // Static files for uploads
 app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+// 上传文件 404 返回 JSON 而非 HTML
+app.use('/uploads', (req, res) => {
+  res.status(404).json({ code: 404, message: '文件不存在' });
+});
 
 // API routes
 app.use('/api/v1', routes);

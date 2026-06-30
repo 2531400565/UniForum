@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import request from '../api/request';
 
 interface UserInfo {
   id: number;
@@ -19,12 +20,17 @@ interface AuthState {
   setAuth: (user: UserInfo, token: string, refreshToken: string) => void;
   logout: () => void;
   updateUser: (user: Partial<UserInfo>) => void;
+  validateToken: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: (() => {
-    const u = localStorage.getItem('user');
-    return u ? JSON.parse(u) : null;
+    try {
+      const u = localStorage.getItem('user');
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
   })(),
   token: localStorage.getItem('accessToken'),
   isLoggedIn: !!localStorage.getItem('accessToken'),
@@ -41,4 +47,22 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, token: null, isLoggedIn: false });
   },
   updateUser: (partial) => set((state) => ({ user: state.user ? { ...state.user, ...partial } : null })),
+  validateToken: async () => {
+    const token = get().token;
+    if (!token) return;
+    try {
+      const res: any = await request.get('/auth/me');
+      if (res.data) {
+        set({ user: { ...get().user, ...res.data } as UserInfo });
+      }
+    } catch {
+      // Token 无效且刷新失败，执行登出
+      get().logout();
+    }
+  },
 }));
+
+// 初始化时验证 Token（静默执行，不阻塞页面渲染）
+if (typeof window !== 'undefined' && localStorage.getItem('accessToken')) {
+  useAuthStore.getState().validateToken();
+}

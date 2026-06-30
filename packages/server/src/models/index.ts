@@ -94,9 +94,10 @@ interface PostAttributes {
   view_count: number;
   like_count: number;
   comment_count: number;
+  is_essential: boolean;
 }
 
-export class Post extends Model<PostAttributes, Optional<PostAttributes, 'id' | 'type' | 'status' | 'view_count' | 'like_count' | 'comment_count'>> implements PostAttributes {
+export class Post extends Model<PostAttributes, Optional<PostAttributes, 'id' | 'type' | 'status' | 'view_count' | 'like_count' | 'comment_count' | 'is_essential'>> implements PostAttributes {
   declare id: number;
   declare title: string;
   declare content: string;
@@ -107,6 +108,7 @@ export class Post extends Model<PostAttributes, Optional<PostAttributes, 'id' | 
   declare view_count: number;
   declare like_count: number;
   declare comment_count: number;
+  declare is_essential: boolean;
   declare readonly created_at: Date;
   declare readonly updated_at: Date;
 }
@@ -134,9 +136,10 @@ interface CommentAttributes {
   parent_id: number | null;
   reply_to_id: number | null;
   status: 'active' | 'deleted';
+  like_count: number;
 }
 
-export class Comment extends Model<CommentAttributes, Optional<CommentAttributes, 'id' | 'parent_id' | 'reply_to_id' | 'status'>> implements CommentAttributes {
+export class Comment extends Model<CommentAttributes, Optional<CommentAttributes, 'id' | 'parent_id' | 'reply_to_id' | 'status' | 'like_count'>> implements CommentAttributes {
   declare id: number;
   declare content: string;
   declare post_id: number;
@@ -144,8 +147,10 @@ export class Comment extends Model<CommentAttributes, Optional<CommentAttributes
   declare parent_id: number | null;
   declare reply_to_id: number | null;
   declare status: 'active' | 'deleted';
+  declare like_count: number;
   declare readonly created_at: Date;
   declare readonly updated_at: Date;
+  declare replies?: Comment[];
 }
 
 Comment.init({
@@ -483,7 +488,7 @@ interface NotificationAttributes {
   id: number;
   user_id: number;
   sender_id: number | null;
-  type: 'comment' | 'reply' | 'like' | 'system' | 'adopt';
+  type: 'comment' | 'reply' | 'like' | 'system' | 'adopt' | 'message';
   title: string;
   content: string | null;
   target_type: string | null;
@@ -495,7 +500,7 @@ export class Notification extends Model<NotificationAttributes, Optional<Notific
   declare id: number;
   declare user_id: number;
   declare sender_id: number | null;
-  declare type: 'comment' | 'reply' | 'like' | 'system' | 'adopt';
+  declare type: 'comment' | 'reply' | 'like' | 'system' | 'adopt' | 'message';
   declare title: string;
   declare content: string | null;
   declare target_type: string | null;
@@ -509,7 +514,7 @@ Notification.init({
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   user_id: { type: DataTypes.INTEGER, allowNull: false },
   sender_id: { type: DataTypes.INTEGER, allowNull: true },
-  type: { type: DataTypes.ENUM('comment', 'reply', 'like', 'system', 'adopt'), allowNull: false },
+  type: { type: DataTypes.ENUM('comment', 'reply', 'like', 'system', 'adopt', 'message'), allowNull: false },
   title: { type: DataTypes.STRING(200), allowNull: false },
   content: { type: DataTypes.STRING(500), allowNull: true },
   target_type: { type: DataTypes.STRING(50), allowNull: true },
@@ -522,6 +527,7 @@ export class Favorite extends Model {
   declare id: number;
   declare user_id: number;
   declare post_id: number;
+  declare post?: Post;
 }
 
 Favorite.init({
@@ -529,6 +535,82 @@ Favorite.init({
   user_id: { type: DataTypes.INTEGER, allowNull: false },
   post_id: { type: DataTypes.INTEGER, allowNull: false },
 }, { sequelize, tableName: 'favorites', indexes: [{ unique: true, fields: ['user_id', 'post_id'] }] });
+
+// ============ Tag ============
+export class Tag extends Model {
+  declare id: number;
+  declare name: string;
+  declare color: string;
+  declare usage_count: number;
+  declare readonly created_at: Date;
+}
+
+Tag.init({
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING(50), allowNull: false, unique: true },
+  color: { type: DataTypes.STRING(20), defaultValue: 'default' },
+  usage_count: { type: DataTypes.INTEGER, defaultValue: 0 },
+}, { sequelize, tableName: 'tags' });
+
+// ============ PostTag ============
+export class PostTag extends Model {
+  declare id: number;
+  declare post_id: number;
+  declare tag_id: number;
+}
+
+PostTag.init({
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  post_id: { type: DataTypes.INTEGER, allowNull: false },
+  tag_id: { type: DataTypes.INTEGER, allowNull: false },
+}, { sequelize, tableName: 'post_tags', indexes: [{ unique: true, fields: ['post_id', 'tag_id'] }] });
+
+// ============ Following ============
+export class Following extends Model {
+  declare id: number;
+  declare follower_id: number;
+  declare following_id: number;
+  declare readonly created_at: Date;
+}
+
+Following.init({
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  follower_id: { type: DataTypes.INTEGER, allowNull: false },
+  following_id: { type: DataTypes.INTEGER, allowNull: false },
+}, { sequelize, tableName: 'followings', indexes: [{ unique: true, fields: ['follower_id', 'following_id'] }] });
+
+// ============ Conversation ============
+export class Conversation extends Model {
+  declare id: number;
+  declare participant_ids: number[];
+  declare last_message_at: Date;
+  declare readonly created_at: Date;
+  declare readonly updated_at: Date;
+}
+
+Conversation.init({
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  participant_ids: { type: DataTypes.JSON, allowNull: false },
+  last_message_at: { type: DataTypes.DATE, allowNull: true },
+}, { sequelize, tableName: 'conversations' });
+
+// ============ Message ============
+export class Message extends Model {
+  declare id: number;
+  declare conversation_id: number;
+  declare sender_id: number;
+  declare content: string;
+  declare is_read: boolean;
+  declare readonly created_at: Date;
+}
+
+Message.init({
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  conversation_id: { type: DataTypes.INTEGER, allowNull: false },
+  sender_id: { type: DataTypes.INTEGER, allowNull: false },
+  content: { type: DataTypes.TEXT, allowNull: false },
+  is_read: { type: DataTypes.BOOLEAN, defaultValue: false },
+}, { sequelize, tableName: 'messages', indexes: [{ fields: ['conversation_id', 'created_at'] }] });
 
 // ============ Associations ============
 // Board
@@ -590,5 +672,20 @@ Notification.belongsTo(User, { foreignKey: 'sender_id', as: 'sender' });
 // Favorite
 Favorite.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 Favorite.belongsTo(Post, { foreignKey: 'post_id', as: 'post' });
+
+// Tag & PostTag (many-to-many through PostTag)
+Post.belongsToMany(Tag, { through: PostTag, foreignKey: 'post_id', as: 'tags' });
+Tag.belongsToMany(Post, { through: PostTag, foreignKey: 'tag_id', as: 'posts' });
+PostTag.belongsTo(Post, { foreignKey: 'post_id', as: 'post' });
+PostTag.belongsTo(Tag, { foreignKey: 'tag_id', as: 'tag' });
+
+// Following — 别名不能与模型名相同（Windows MySQL 大小写不敏感）
+Following.belongsTo(User, { foreignKey: 'follower_id', as: 'followerUser' });
+Following.belongsTo(User, { foreignKey: 'following_id', as: 'followingUser' });
+
+// Conversation & Message
+Message.belongsTo(Conversation, { foreignKey: 'conversation_id', as: 'conversation' });
+Message.belongsTo(User, { foreignKey: 'sender_id', as: 'sender' });
+Conversation.hasMany(Message, { foreignKey: 'conversation_id', as: 'messages' });
 
 export { sequelize };

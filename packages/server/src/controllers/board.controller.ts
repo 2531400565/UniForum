@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Board, User } from '../models';
+import { Board, User, Post } from '../models';
 import { success, fail } from '../utils/response';
 import { AuthRequest } from '../middlewares/auth';
 
@@ -54,6 +54,8 @@ export async function deleteBoard(req: AuthRequest, res: Response) {
   try {
     const board = await Board.findByPk(parseInt(req.params.id));
     if (!board) return fail(res, '版块不存在', 404);
+    const postCount = await Post.count({ where: { board_id: board.id, status: 'active' } });
+    if (postCount > 0) return fail(res, `版块下还有 ${postCount} 个帖子，无法删除`, 400);
     await board.destroy();
     return success(res, null, '删除成功');
   } catch (error: any) {

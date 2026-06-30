@@ -1,35 +1,42 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Input, Badge, Dropdown, Avatar, Space, Typography, Popover, List, Button, Empty, Tag } from 'antd';
+import { Layout, Menu, Input, Badge, Dropdown, Avatar, Space, Typography, Popover, List, Button, Empty, Tag, theme, Drawer } from 'antd';
 import {
   HomeOutlined, MessageOutlined, NotificationOutlined, ShopOutlined,
   QuestionCircleOutlined, FileTextOutlined, SearchOutlined, UserOutlined,
   LogoutOutlined, SettingOutlined, BellOutlined, HeartOutlined,
+  SunOutlined, MoonOutlined, MenuOutlined, MailOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { useEffect, useState, useCallback } from 'react';
+import { useThemeStore } from '../../stores/useThemeStore';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import request from '../../api/request';
+import { io, Socket } from 'socket.io-client';
+import { getNotificationLink, getNotifTypeLabel } from '../../utils/notification';
 
 const { Header, Content, Footer } = Layout;
 const { Text } = Typography;
 
-const typeLabels: any = {
-  comment: '评论', reply: '回复', like: '点赞', system: '系统', adopt: '采纳',
-};
-
-function getNotificationLink(n: any): string {
-  if (n.type === 'comment' || n.type === 'reply' || n.type === 'like') return `/forum/post/${n.target_id}`;
-  if (n.type === 'adopt') return `/qa/${n.target_id}`;
-  return '/notifications';
-}
+// 响应式断点
+const MOBILE_BREAKPOINT = 768;
 
 export default function AppLayout() {
+  const { token } = theme.useToken();
   const { user, isLoggedIn, logout } = useAuthStore();
+  const { themeMode, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
   const [unread, setUnread] = useState(0);
   const [searchVal, setSearchVal] = useState('');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loadingNotif, setLoadingNotif] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BREAKPOINT);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const fetchUnread = useCallback(() => {
     if (isLoggedIn) {
@@ -38,6 +45,30 @@ export default function AppLayout() {
   }, [isLoggedIn]);
 
   useEffect(() => { fetchUnread(); }, [fetchUnread]);
+
+  // Socket.IO 实时监听通知（私信、评论、点赞、关注等）
+  const socketRef = useRef<Socket | null>(null);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+    const socket = io(window.location.origin, {
+      auth: { token },
+      path: '/socket.io',
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+    });
+    socketRef.current = socket;
+    socket.on('newMessage', () => { fetchUnread(); });
+    socket.on('notification', () => { fetchUnread(); });
+    // 重连后重新拉取通知，避免断线期间遗漏
+    socket.on('connect', () => {
+      fetchUnread();
+      if (popoverOpen) fetchNotifications();
+    });
+    return () => { socket.disconnect(); };
+  }, [isLoggedIn, fetchUnread]);
 
   const fetchNotifications = () => {
     setLoadingNotif(true);
@@ -78,6 +109,12 @@ export default function AppLayout() {
     { key: '/qa', icon: <QuestionCircleOutlined />, label: <Link to="/qa">问答</Link> },
   ];
 
+  const loggedInExtraItems = isLoggedIn ? [
+    { key: '/messages', icon: <MailOutlined />, label: <Link to="/messages">私信</Link> },
+  ] : [];
+
+  const allMenuItems = [...menuItems, ...loggedInExtraItems];
+
   const userMenu = {
     items: [
       { key: 'profile', icon: <UserOutlined />, label: '个人主页', onClick: () => navigate(`/profile/${user?.id}`) },
@@ -93,7 +130,7 @@ export default function AppLayout() {
 
   const notifContent = (
     <div style={{ width: 340, maxHeight: 420, overflow: 'auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Text strong>通知</Text>
         {unread > 0 && <Button type="link" size="small" onClick={handleMarkAllRead}>全部已读</Button>}
       </div>
@@ -109,7 +146,7 @@ export default function AppLayout() {
               style={{
                 padding: '10px 4px',
                 cursor: 'pointer',
-                background: item.is_read ? 'transparent' : '#f6faff',
+                background: item.is_read ? 'transparent' : token.colorInfoBg,
                 borderRadius: 4,
               }}
               onClick={() => handleNotifClick(item)}
@@ -122,7 +159,7 @@ export default function AppLayout() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={{ fontSize: 13 }}>
                       <Text strong style={{ fontSize: 13 }}>{item.sender?.nickname}</Text>
-                      {' '}{typeLabels[item.type] || item.type}了你
+                      {' '}{item.type === 'message' ? getNotifTypeLabel(item) : `${getNotifTypeLabel(item)}了你`}
                     </Text>
                     {!item.is_read && <Badge status="processing" />}
                   </div>
@@ -138,7 +175,7 @@ export default function AppLayout() {
         />
       )}
       {notifications.length > 0 && (
-        <div style={{ textAlign: 'center', paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+        <div style={{ textAlign: 'center', paddingTop: 8, borderTop: `1px solid ${token.colorBorderSecondary}` }}>
           <Button type="link" size="small" onClick={() => { setPopoverOpen(false); navigate('/notifications'); }}>
             查看全部通知
           </Button>
@@ -149,19 +186,36 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '0 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div className="logo" style={{ marginRight: 32, cursor: 'pointer' }} onClick={() => navigate('/')}>
-          UniForum
-        </div>
-        <Menu mode="horizontal" items={menuItems} style={{ flex: 1, minWidth: 0, border: 'none' }} />
-        <Space size="middle" style={{ marginLeft: 16 }}>
-          <Input.Search
-            placeholder="搜索..."
-            style={{ width: 200 }}
-            value={searchVal}
-            onChange={(e) => setSearchVal(e.target.value)}
-            onSearch={handleSearch}
-            prefix={<SearchOutlined />}
+      <Header style={{ display: 'flex', alignItems: 'center', background: token.colorBgContainer, padding: isMobile ? '0 12px' : '0 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 100 }}>
+        {isMobile ? (
+          <>
+            <Button type="text" icon={<MenuOutlined />} onClick={() => setDrawerOpen(true)} style={{ marginRight: 8 }} />
+            <div className="logo" style={{ flex: 1, cursor: 'pointer' }} onClick={() => navigate('/')}>UniForum</div>
+          </>
+        ) : (
+          <>
+            <div className="logo" style={{ marginRight: 32, cursor: 'pointer' }} onClick={() => navigate('/')}>
+              UniForum
+            </div>
+            <Menu mode="horizontal" items={[...menuItems, ...loggedInExtraItems]} style={{ flex: 1, minWidth: 0, border: 'none' }} />
+          </>
+        )}
+        <Space size={isMobile ? 'small' : 'middle'} style={{ marginLeft: isMobile ? 0 : 16 }}>
+          {!isMobile && (
+            <Input.Search
+              placeholder="搜索..."
+              style={{ width: 200 }}
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+              onSearch={handleSearch}
+              prefix={<SearchOutlined />}
+            />
+          )}
+          <Button
+            type="text"
+            icon={themeMode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+            onClick={toggleTheme}
+            title={themeMode === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
           />
           {isLoggedIn && (
             <Popover
@@ -181,7 +235,7 @@ export default function AppLayout() {
             <Dropdown menu={userMenu} trigger={['click']}>
               <Space style={{ cursor: 'pointer' }}>
                 <Avatar size="small" src={user?.avatarUrl} icon={<UserOutlined />} />
-                <Text>{user?.nickname}</Text>
+                {!isMobile && <Text>{user?.nickname}</Text>}
               </Space>
             </Dropdown>
           ) : (
@@ -192,10 +246,35 @@ export default function AppLayout() {
           )}
         </Space>
       </Header>
-      <Content style={{ background: '#f5f5f5', minHeight: 'calc(100vh - 134px)' }}>
+
+      {/* 移动端抽屉菜单 */}
+      <Drawer
+        title="菜单"
+        placement="left"
+        onClose={() => setDrawerOpen(false)}
+        open={drawerOpen}
+        styles={{ body: { padding: 0 } }}
+        width={260}
+      >
+        <Menu
+          mode="vertical"
+          items={[...menuItems, ...loggedInExtraItems]}
+          onClick={() => setDrawerOpen(false)}
+          style={{ border: 'none' }}
+        />
+        <div style={{ padding: '16px' }}>
+          <Input.Search
+            placeholder="搜索..."
+            value={searchVal}
+            onChange={(e) => setSearchVal(e.target.value)}
+            onSearch={(v) => { handleSearch(v); setDrawerOpen(false); }}
+          />
+        </div>
+      </Drawer>
+      <Content style={{ background: token.colorBgLayout, minHeight: 'calc(100vh - 134px)' }} className="page-fade-in">
         <Outlet />
       </Content>
-      <Footer style={{ textAlign: 'center', background: '#fff', color: '#999' }}>
+      <Footer style={{ textAlign: 'center', background: token.colorBgContainer, color: token.colorTextSecondary }}>
         UniForum ©2026 大学校园交流社区
       </Footer>
     </Layout>

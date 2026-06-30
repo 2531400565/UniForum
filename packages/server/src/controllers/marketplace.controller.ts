@@ -4,6 +4,7 @@ import { MarketItem, User } from '../models';
 import { success, fail } from '../utils/response';
 import { AuthRequest } from '../middlewares/auth';
 import { getPagination, paginatedResult } from '../utils/pagination';
+import { sanitizeText } from '../utils/sanitize';
 
 export async function getList(req: AuthRequest, res: Response) {
   try {
@@ -11,7 +12,7 @@ export async function getList(req: AuthRequest, res: Response) {
     const { category, status, minPrice, maxPrice, keyword } = req.query;
     const where: any = {};
     if (!status || status === 'all') {
-      where.status = { [Op.in]: ['selling', 'sold'] };
+      where.status = { [Op.in]: ['selling', 'reserved', 'sold'] };
     } else {
       where.status = status;
     }
@@ -39,8 +40,9 @@ export async function create(req: AuthRequest, res: Response) {
   try {
     const { title, description, price, originalPrice, conditionLevel, category, images, contactInfo } = req.body;
     if (!title || !description || !price || !conditionLevel || !category) return fail(res, '必填字段不能为空');
+    if (isNaN(Number(price)) || Number(price) < 0) return fail(res, '价格必须为非负数字');
     const item = await MarketItem.create({
-      title, description, price, original_price: originalPrice || null,
+      title: sanitizeText(title), description: sanitizeText(description), price: Number(price), original_price: originalPrice || null,
       condition_level: conditionLevel, category,
       images: images ? JSON.stringify(images) : null,
       contact_info: contactInfo || null, seller_id: req.userId!,
@@ -55,9 +57,9 @@ export async function update(req: AuthRequest, res: Response) {
     if (!item) return fail(res, '商品不存在', 404);
     if (item.seller_id !== req.userId && req.userRole !== 'admin') return fail(res, '无权修改', 403);
     const { title, description, price, originalPrice, conditionLevel, category, images, contactInfo } = req.body;
-    if (title) item.title = title;
-    if (description) item.description = description;
-    if (price) item.price = price;
+    if (title) item.title = sanitizeText(title);
+    if (description) item.description = sanitizeText(description);
+    if (price) item.price = Number(price);
     if (originalPrice !== undefined) item.original_price = originalPrice;
     if (conditionLevel) item.condition_level = conditionLevel;
     if (category) item.category = category;

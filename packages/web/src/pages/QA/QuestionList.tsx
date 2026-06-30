@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { List, Typography, Tag, Pagination, Spin, Card, Button, Space, Modal, Form, Input, Select, message } from 'antd';
+import { List, Typography, Tag, Pagination, Card, Button, Space, Modal, Form, Input, Select, message } from 'antd';
 import { QuestionCircleOutlined, PlusOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
+import { ListSkeleton } from '../../components/Skeleton';
 
 const categoryLabels: any = { course: '选课', internship: '实习', career: '就业', academic: '学术', other: '其他' };
 
@@ -40,7 +41,7 @@ export default function QuestionList() {
         <Typography.Title level={3}><QuestionCircleOutlined /> 问答社区</Typography.Title>
         {isLoggedIn && <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>提问</Button>}
       </div>
-      {loading ? <div style={{ textAlign: 'center', padding: 50 }}><Spin /></div> : (
+      {loading ? <ListSkeleton rows={6} /> : (
         <List dataSource={data} renderItem={(item: any) => (
           <Card style={{ marginBottom: 12, cursor: 'pointer' }} hoverable onClick={() => navigate(`/qa/${item.id}`)}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>

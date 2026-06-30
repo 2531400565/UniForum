@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Card, Typography, Tag, Spin, Space } from 'antd';
+import { Card, Typography, Tag, Space } from 'antd';
 import { useParams } from 'react-router-dom';
 import request from '../../api/request';
 import dayjs from 'dayjs';
+import { PostDetailSkeleton } from '../../components/Skeleton';
 
 export default function AnnouncementDetail() {
   const { id } = useParams();
@@ -14,7 +15,7 @@ export default function AnnouncementDetail() {
     request.get(`/announcements/${id}`).then((res: any) => setData(res.data)).finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 100 }}><Spin size="large" /></div>;
+  if (loading) return <PostDetailSkeleton />;
   if (!data) return <div style={{ textAlign: 'center', padding: 100 }}>公告不存在</div>;
 
   return (

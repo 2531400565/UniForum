@@ -57,6 +57,11 @@ export async function downloadResource(req: AuthRequest, res: Response) {
 
     const filePath = path.join(path.resolve(__dirname, '../..'), r.file_url.replace(/^\//, ''));
     if (!require('fs').existsSync(filePath)) return fail(res, '文件不存在', 404);
+
+    // 先递增下载计数和记录下载，再发送文件
+    await r.increment('download_count');
+    await ResourceDownload.findOrCreate({ where: { resource_id: r.id, user_id: req.userId! } });
+
     // 手动设置 Content-Disposition，正确处理中文文件名 (RFC 5987)
     const encodedName = encodeURIComponent(r.file_name).replace(/['()]/g, escape).replace(/\*/g, '%2A');
     res.setHeader('Content-Disposition', `attachment; filename="${encodedName}"; filename*=UTF-8''${encodedName}`);
@@ -64,9 +69,6 @@ export async function downloadResource(req: AuthRequest, res: Response) {
     res.sendFile(filePath, (err) => {
       if (err) console.error('下载失败:', err.message);
     });
-
-    await r.increment('download_count');
-    await ResourceDownload.findOrCreate({ where: { resource_id: r.id, user_id: req.userId! } });
   } catch (error: any) { return fail(res, error.message, 500); }
 }
 
@@ -76,7 +78,9 @@ export async function rateResource(req: AuthRequest, res: Response) {
     const { rating, review } = req.body;
     if (!rating || rating < 1 || rating > 5) return fail(res, '评分为1-5');
 
-    const [download, created] = await ResourceDownload.findOrCreate({ where: { resource_id: resourceId, user_id: req.userId! } });
+    // 必须先下载才能评分
+    const download = await ResourceDownload.findOne({ where: { resource_id: resourceId, user_id: req.userId! } });
+    if (!download) return fail(res, '请先下载资源后再评分', 403);
     download.rating = rating;
     download.review = review || null;
     await download.save();

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Typography, Tag, Button, Spin } from 'antd';
+import { Card, Row, Col, Typography, Tag, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { PlusOutlined, MessageOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { BoardListSkeleton } from '../../components/Skeleton';
 
 const categoryLabels: any = { department: '院系', interest: '兴趣', academic: '学术' };
 const categoryColors: any = { department: 'blue', interest: 'green', academic: 'purple' };
@@ -15,12 +16,12 @@ export default function BoardList() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    request.get('/boards').then((res: any) => setBoards(res.data || [])).finally(() => setLoading(false));
+    request.get('/boards').then((res: any) => setBoards(res.data || [])).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 100 }}><Spin size="large" /></div>;
+  if (loading) return <BoardListSkeleton />;
 
-  const grouped = { department: [] as any[], interest: [] as any[], academic: [] as any[] };
+  const grouped: Record<string, any[]> = { department: [] as any[], interest: [] as any[], academic: [] as any[] };
   boards.forEach(b => { if (grouped[b.category]) grouped[b.category].push(b); });
 
   return (

@@ -4,14 +4,15 @@ import { Announcement, User } from '../models';
 import { success, fail } from '../utils/response';
 import { AuthRequest } from '../middlewares/auth';
 import { getPagination, paginatedResult } from '../utils/pagination';
+import { sanitizeText } from '../utils/sanitize';
 
 export async function getAnnouncements(req: AuthRequest, res: Response) {
   try {
     const { limit, offset, page, pageSize } = getPagination(req.query.page, req.query.pageSize);
     const { type } = req.query;
     const where: any = {};
-    if (req.query.showAll === 'true') {
-      // admin can see all statuses
+    if (req.query.showAll === 'true' && (req.userRole === 'admin' || req.userRole === 'moderator')) {
+      // admin/moderator can see all statuses
     } else {
       where.status = 'active';
     }
@@ -36,7 +37,7 @@ export async function createAnnouncement(req: AuthRequest, res: Response) {
   try {
     const { title, content, type, priority, startDate, endDate } = req.body;
     if (!title || !content || !type) return fail(res, '标题、内容和类型不能为空');
-    const a = await Announcement.create({ title, content, type, publisher_id: req.userId!, priority: priority || 0, start_date: startDate || null, end_date: endDate || null });
+    const a = await Announcement.create({ title: sanitizeText(title), content: sanitizeText(content), type, publisher_id: req.userId!, priority: priority || 0, start_date: startDate || null, end_date: endDate || null });
     return success(res, a, '发布成功', 201);
   } catch (error: any) { return fail(res, error.message, 500); }
 }
@@ -46,8 +47,8 @@ export async function updateAnnouncement(req: AuthRequest, res: Response) {
     const a = await Announcement.findByPk(parseInt(req.params.id));
     if (!a) return fail(res, '公告不存在', 404);
     const { title, content, type, priority, startDate, endDate, status } = req.body;
-    if (title) a.title = title;
-    if (content) a.content = content;
+    if (title) a.title = sanitizeText(title);
+    if (content) a.content = sanitizeText(content);
     if (type) a.type = type;
     if (priority !== undefined) a.priority = priority;
     if (startDate !== undefined) a.start_date = startDate;

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { List, Typography, Tag, Button, Pagination, Spin, Space } from 'antd';
-import { useParams, useNavigate } from 'react-router-dom';
+import { List, Typography, Tag, Button, Pagination, Space } from 'antd';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { EyeOutlined, LikeOutlined, MessageOutlined, PushpinOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
+import { ListSkeleton } from '../../components/Skeleton';
 
 export default function BoardDetail() {
   const { id } = useParams();
@@ -28,7 +29,7 @@ export default function BoardDetail() {
     }).finally(() => setLoading(false));
   }, [id, page]);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 100 }}><Spin size="large" /></div>;
+  if (loading) return <ListSkeleton rows={10} />;
 
   return (
     <div className="page-container">
@@ -46,7 +47,7 @@ export default function BoardDetail() {
             <List.Item.Meta
               title={<Space>{item.type === 'pinned' && <Tag color="orange">置顶</Tag>}{item.is_essential && <Tag color="gold">精华</Tag>}<span>{item.title}</span></Space>}
               description={<Space size="large">
-                <span>{item.author?.nickname}</span>
+                <Link to={`/profile/${item.author?.id}`}>{item.author?.nickname}</Link>
                 <span>{dayjs(item.created_at).format('YYYY-MM-DD HH:mm')}</span>
               </Space>}
             />

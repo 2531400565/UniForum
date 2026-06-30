@@ -1,4 +1,4 @@
-export function getPagination(page?: string | number, pageSize?: string | number) {
+export function getPagination(page?: any, pageSize?: any) {
   const p = Math.max(1, parseInt(String(page || 1)));
   const ps = Math.min(100, Math.max(1, parseInt(String(pageSize || 20))));
   return { limit: ps, offset: (p - 1) * ps, page: p, pageSize: ps };

@@ -12,8 +12,8 @@ export const config = {
     password: process.env.DB_PASSWORD || '',
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'uniforum_jwt_secret',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'uniforum_jwt_refresh_secret',
+    secret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'uniforum_jwt_secret'),
+    refreshSecret: process.env.JWT_REFRESH_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'uniforum_jwt_refresh_secret'),
     accessTokenExpiry: '2h',
     refreshTokenExpiry: '7d',
   },

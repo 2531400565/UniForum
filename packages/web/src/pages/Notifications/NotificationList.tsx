@@ -3,16 +3,7 @@ import { Typography, List, Avatar, Button, Badge, Space, Card, Empty, message } 
 import { BellOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import request from '../../api/request';
-
-const typeLabels: any = {
-  comment: '评论', reply: '回复', like: '点赞', system: '系统', adopt: '采纳',
-};
-
-function getLink(n: any): string {
-  if (n.type === 'comment' || n.type === 'reply' || n.type === 'like') return `/forum/post/${n.target_id}`;
-  if (n.type === 'adopt') return `/qa/${n.target_id}`;
-  return '/';
-}
+import { getNotificationLink as getLink, getNotifTypeLabel } from '../../utils/notification';
 
 export default function NotificationList() {
   const navigate = useNavigate();
@@ -80,7 +71,7 @@ export default function NotificationList() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>
                         <Typography.Text strong>{item.sender?.nickname}</Typography.Text>
-                        {' '}{typeLabels[item.type] || item.type}了你
+                        {item.type === 'message' ? getNotifTypeLabel(item) : `${getNotifTypeLabel(item)}了你`}
                       </span>
                       {!item.is_read && <Badge status="processing" text="未读" />}
                     </div>

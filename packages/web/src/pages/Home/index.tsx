@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, List, Typography, Tag, Space, Spin, Statistic, Avatar } from 'antd';
+import { Card, Row, Col, List, Typography, Tag, Space, Statistic, Avatar } from 'antd';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   NotificationOutlined, MessageOutlined, QuestionCircleOutlined, ShopOutlined,
@@ -8,6 +8,7 @@ import {
 import request from '../../api/request';
 import dayjs from 'dayjs';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { HomeSkeleton } from '../../components/Skeleton';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -26,22 +27,22 @@ export default function Home() {
       request.get('/lost-found', { params: { pageSize: 4 } }),
       request.get('/marketplace', { params: { pageSize: 4, status: 'all' } }),
       request.get('/resources', { params: { pageSize: 4 } }),
-      request.get('/posts', { params: { pageSize: 1 } }),
-      request.get('/qa/questions', { params: { pageSize: 1 } }),
-    ]).then(([a, p, q, l, m, r, ps, qs]: any[]) => {
+    ]).then(([a, p, q, l, m, r]: any[]) => {
       setData({
-        announcements: a.data?.list || [],
-        posts: p.data?.list || [],
-        questions: q.data?.list || [],
-        lostFound: l.data?.list || [],
-        marketItems: m.data?.list || [],
-        resources: r.data?.list || [],
+        announcements: a?.data?.list || [],
+        posts: p?.data?.list || [],
+        questions: q?.data?.list || [],
+        lostFound: l?.data?.list || [],
+        marketItems: m?.data?.list || [],
+        resources: r?.data?.list || [],
       });
-      setStats(s => ({ ...s, posts: ps.data?.total || 0, questions: qs.data?.total || 0 }));
+      setStats(s => ({ ...s, posts: p?.data?.total || 0, questions: q?.data?.total || 0 }));
+    }).catch(() => {
+      // 部分请求失败时仍展示已获取的数据
     }).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 100 }}><Spin size="large" /></div>;
+  if (loading) return <HomeSkeleton />;
 
   return (
     <div className="page-container">
@@ -52,7 +53,7 @@ export default function Home() {
           background: 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)',
           border: 'none',
         }}
-        bodyStyle={{ padding: '24px 32px' }}
+        styles={{ body: { padding: '24px 32px' } }}
       >
         <Row align="middle" justify="space-between">
           <Col>
@@ -86,7 +87,7 @@ export default function Home() {
           { icon: <FileTextOutlined />, label: '资料库', path: '/resources', color: '#722ed1' },
           { icon: <QuestionCircleOutlined />, label: '问答', path: '/qa', color: '#13c2c2' },
         ].map(item => (
-          <Col span={4} key={item.label}>
+          <Col xs={8} sm={8} md={4} key={item.label}>
             <Card
               hoverable
               size="small"
@@ -122,7 +123,7 @@ export default function Home() {
 
       <Row gutter={16}>
         {/* 热门帖子 */}
-        <Col span={14}>
+        <Col xs={24} md={14}>
           <Card title={<><FireOutlined style={{ color: '#fa541c' }} /> 热门帖子</>} style={{ marginBottom: 16 }} extra={<Link to="/forum">更多</Link>}>
             <List
               dataSource={data.posts}
@@ -136,7 +137,7 @@ export default function Home() {
                     <div>
                       <Text strong ellipsis style={{ maxWidth: 280, display: 'block' }}>{item.title}</Text>
                       <Space size="small" style={{ marginTop: 2 }}>
-                        <Text type="secondary" style={{ fontSize: 12 }}>{item.author?.nickname}</Text>
+                        <Link to={`/profile/${item.author?.id}`}><Text type="secondary" style={{ fontSize: 12 }}>{item.author?.nickname}</Text></Link>
                         <Text type="secondary" style={{ fontSize: 12 }}>{item.board?.name}</Text>
                       </Space>
                     </div>
@@ -153,7 +154,7 @@ export default function Home() {
         </Col>
 
         {/* 最新问答 */}
-        <Col span={10}>
+        <Col xs={24} md={10}>
           <Card title={<><QuestionCircleOutlined style={{ color: '#13c2c2' }} /> 最新问答</>} style={{ marginBottom: 16 }} extra={<Link to="/qa">更多</Link>}>
             <List
               dataSource={data.questions}
@@ -179,7 +180,7 @@ export default function Home() {
 
       {/* 底部三栏 */}
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Card title={<><HeartOutlined style={{ color: '#eb2f96' }} /> 失物招领</>} size="small" extra={<Link to="/lost-found">更多</Link>}>
             <List
               dataSource={data.lostFound}
@@ -195,7 +196,7 @@ export default function Home() {
             />
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Card title={<><ShopOutlined style={{ color: '#fa8c16' }} /> 二手市场</>} size="small" extra={<Link to="/marketplace">更多</Link>}>
             <List
               dataSource={data.marketItems}
@@ -211,7 +212,7 @@ export default function Home() {
             />
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Card title={<><FileTextOutlined style={{ color: '#722ed1' }} /> 学习资源</>} size="small" extra={<Link to="/resources">更多</Link>}>
             <List
               dataSource={data.resources}

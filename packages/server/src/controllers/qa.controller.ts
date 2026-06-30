@@ -4,6 +4,8 @@ import { Question, Answer, User, Notification } from '../models';
 import { success, fail } from '../utils/response';
 import { AuthRequest } from '../middlewares/auth';
 import { getPagination, paginatedResult } from '../utils/pagination';
+import { sanitizeText } from '../utils/sanitize';
+import { pushNotification } from '../services/socketService';
 
 export async function getQuestions(req: AuthRequest, res: Response) {
   try {
@@ -30,7 +32,10 @@ export async function getQuestion(req: AuthRequest, res: Response) {
       ],
     });
     if (!q) return fail(res, '问题不存在', 404);
-    await q.increment('view_count');
+    // 浏览量递增（作者自己不计数）
+    if (q.author_id !== req.userId) {
+      await q.increment('view_count');
+    }
     return success(res, q);
   } catch (error: any) { return fail(res, error.message, 500); }
 }
@@ -39,7 +44,10 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   try {
     const { title, content, category, tags } = req.body;
     if (!title || !content || !category) return fail(res, '标题、内容和分类不能为空');
-    const q = await Question.create({ title, content, category, tags: tags ? JSON.stringify(tags) : null, author_id: req.userId! });
+    // XSS 净化
+    const safeTitle = sanitizeText(title);
+    const safeContent = sanitizeText(content);
+    const q = await Question.create({ title: safeTitle, content: safeContent, category, tags: tags ? JSON.stringify(tags) : null, author_id: req.userId! });
     return success(res, q, '提问成功', 201);
   } catch (error: any) { return fail(res, error.message, 500); }
 }
@@ -50,8 +58,8 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     if (!q) return fail(res, '问题不存在', 404);
     if (q.author_id !== req.userId) return fail(res, '无权修改', 403);
     const { title, content, category, tags } = req.body;
-    if (title) q.title = title;
-    if (content) q.content = content;
+    if (title) q.title = sanitizeText(title);
+    if (content) q.content = sanitizeText(content);
     if (category) q.category = category;
     if (tags) q.tags = JSON.stringify(tags);
     await q.save();
@@ -76,10 +84,13 @@ export async function createAnswer(req: AuthRequest, res: Response) {
     if (!q) return fail(res, '问题不存在', 404);
     const { content } = req.body;
     if (!content) return fail(res, '回答内容不能为空');
-    const a = await Answer.create({ content, question_id: qId, author_id: req.userId! });
+    // XSS 净化
+    const safeContent = sanitizeText(content);
+    const a = await Answer.create({ content: safeContent, question_id: qId, author_id: req.userId! });
     await q.increment('answer_count');
     if (q.author_id !== req.userId) {
-      await Notification.create({ user_id: q.author_id, sender_id: req.userId, type: 'comment', title: '有人回答了你的问题', target_type: 'question', target_id: qId });
+      const notif = await Notification.create({ user_id: q.author_id, sender_id: req.userId, type: 'comment', title: '有人回答了你的问题', target_type: 'question', target_id: qId });
+      pushNotification(q.author_id, notif);
     }
     const created = await Answer.findByPk(a.id, { include: [{ model: User, as: 'author', attributes: ['id', 'nickname', 'avatar_url'] }] });
     return success(res, created, '回答成功', 201);
@@ -93,6 +104,9 @@ export async function deleteAnswer(req: AuthRequest, res: Response) {
     if (a.author_id !== req.userId && req.userRole !== 'admin') return fail(res, '无权删除', 403);
     a.status = 'deleted';
     await a.save();
+    // 递减问题回答数
+    const q = await Question.findByPk(a.question_id);
+    if (q && q.answer_count > 0) await q.decrement('answer_count');
     return success(res, null, '删除成功');
   } catch (error: any) { return fail(res, error.message, 500); }
 }
@@ -107,9 +121,18 @@ export async function acceptAnswer(req: AuthRequest, res: Response) {
     const a = await Answer.findByPk(aId);
     if (!a || a.question_id !== qId) return fail(res, '回答不存在', 404);
 
-    // Unaccept previous
+    // Unaccept previous — 通知被取消采纳的回答者
     if (q.accepted_answer_id) {
+      const prevAnswer = await Answer.findByPk(q.accepted_answer_id);
       await Answer.update({ is_accepted: false }, { where: { id: q.accepted_answer_id } });
+      if (prevAnswer && prevAnswer.author_id !== req.userId) {
+        const cancelNotif = await Notification.create({
+          user_id: prevAnswer.author_id, sender_id: req.userId,
+          type: 'system', title: '你的回答已被取消采纳',
+          target_type: 'question', target_id: qId,
+        });
+        pushNotification(prevAnswer.author_id, cancelNotif);
+      }
     }
     a.is_accepted = true;
     await a.save();
@@ -117,7 +140,8 @@ export async function acceptAnswer(req: AuthRequest, res: Response) {
     q.status = 'resolved';
     await q.save();
 
-    await Notification.create({ user_id: a.author_id, sender_id: req.userId, type: 'adopt', title: '你的回答被采纳了', target_type: 'question', target_id: qId });
+    const notif = await Notification.create({ user_id: a.author_id, sender_id: req.userId, type: 'adopt', title: '你的回答被采纳了', target_type: 'question', target_id: qId });
+    pushNotification(a.author_id, notif);
     return success(res, null, '采纳成功');
   } catch (error: any) { return fail(res, error.message, 500); }
 }
