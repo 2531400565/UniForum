@@ -21,6 +21,7 @@ const MarketDetail = lazy(() => import('./pages/Marketplace/MarketDetail'));
 const ResourceList = lazy(() => import('./pages/Resource/ResourceList'));
 const QuestionList = lazy(() => import('./pages/QA/QuestionList'));
 const QuestionDetail = lazy(() => import('./pages/QA/QuestionDetail'));
+const AIChat = lazy(() => import('./pages/QA/AIChat'));
 const ProfilePage = lazy(() => import('./pages/Profile/ProfilePage'));
 const SearchResults = lazy(() => import('./pages/Search/SearchResults'));
 const AdminDashboard = lazy(() => import('./pages/Admin/Dashboard'));
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="/marketplace/:id" element={<MarketDetail />} />
           <Route path="/resources" element={<ResourceList />} />
           <Route path="/qa" element={<QuestionList />} />
+          <Route path="/qa/ai" element={<AIChat />} />
           <Route path="/qa/:id" element={<QuestionDetail />} />
           <Route path="/profile/:id" element={<ProfilePage />} />
           <Route path="/search" element={<SearchResults />} />

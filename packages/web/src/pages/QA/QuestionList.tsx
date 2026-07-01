@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { List, Typography, Tag, Pagination, Card, Button, Space, Modal, Form, Input, Select, message } from 'antd';
-import { QuestionCircleOutlined, PlusOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { List, Typography, Tag, Pagination, Card, Button, Space, Modal, Form, Input, Select, message, Spin } from 'antd';
+import { QuestionCircleOutlined, PlusOutlined, CheckCircleOutlined, RobotOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +19,7 @@ export default function QuestionList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form] = Form.useForm();
 
+
   const fetchData = () => {
     setLoading(true);
     request.get('/qa/questions', { params: { page, pageSize: 15 } }).then((res: any) => {
@@ -35,11 +36,18 @@ export default function QuestionList() {
     } catch (err: any) { message.error(err.message); }
   };
 
+
+
   return (
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography.Title level={3}><QuestionCircleOutlined /> 问答社区</Typography.Title>
-        {isLoggedIn && <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>提问</Button>}
+        {isLoggedIn && (
+          <Space>
+            <Button icon={<RobotOutlined />} onClick={() => navigate('/qa/ai')}>向AI提问</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>提问</Button>
+          </Space>
+        )}
       </div>
       {loading ? <ListSkeleton rows={6} /> : (
         <List dataSource={data} renderItem={(item: any) => (
@@ -63,6 +71,8 @@ export default function QuestionList() {
           <Form.Item name="content" label="详细描述" rules={[{ required: true }]}><Input.TextArea rows={5} placeholder="详细描述你的问题..." /></Form.Item>
         </Form>
       </Modal>
+
+
     </div>
   );
 }

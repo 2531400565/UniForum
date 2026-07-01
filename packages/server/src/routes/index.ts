@@ -15,12 +15,16 @@ import * as notificationCtrl from '../controllers/notification.controller';
 import * as tagCtrl from '../controllers/tag.controller';
 import * as messageCtrl from '../controllers/message.controller';
 import * as itemCommentCtrl from '../controllers/itemComment.controller';
+import * as aiCtrl from '../controllers/ai.controller';
 import { auth, optionalAuth } from '../middlewares/auth';
 import { requireRole } from '../middlewares/rbac';
 import { uploadAvatar, uploadImage, uploadResource } from '../middlewares/upload';
 import { authLimiter, uploadLimiter, writeLimiter } from '../middlewares/rateLimiter';
 
 const router = Router();
+
+// AI
+router.post('/ai/chat', auth, writeLimiter, aiCtrl.chatWithAI);
 
 // Auth
 router.post('/auth/register', authLimiter, authCtrl.register);

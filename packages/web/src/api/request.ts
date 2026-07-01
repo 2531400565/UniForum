@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '../stores/useAuthStore';
 
 const request = axios.create({ baseURL: '/api/v1', timeout: 10000 });
 
@@ -46,6 +47,10 @@ request.interceptors.response.use(
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', newRefreshToken);
 
+        // 同步更新 Zustand 状态
+        const currentState = useAuthStore.getState();
+        useAuthStore.setState({ token: accessToken });
+
         // 通知队列中的请求
         refreshQueue.forEach((cb) => cb(accessToken));
         refreshQueue = [];
@@ -59,6 +64,7 @@ request.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
+        useAuthStore.setState({ user: null, token: null, isLoggedIn: false });
         window.location.href = '/login';
         return Promise.reject(err.response?.data || err);
       } finally {
