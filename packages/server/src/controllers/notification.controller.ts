@@ -7,8 +7,12 @@ import { getPagination, paginatedResult } from '../utils/pagination';
 export async function getNotifications(req: AuthRequest, res: Response) {
   try {
     const { limit, offset, page, pageSize } = getPagination(req.query.page, req.query.pageSize);
+    const { filter } = req.query;
+    const where: any = { user_id: req.userId! };
+    if (filter === 'unread') where.is_read = false;
+    else if (filter === 'read') where.is_read = true;
     const { count, rows } = await Notification.findAndCountAll({
-      where: { user_id: req.userId! },
+      where,
       include: [{ model: User, as: 'sender', attributes: ['id', 'nickname', 'avatar_url'] }],
       limit, offset, order: [['created_at', 'DESC']],
     });

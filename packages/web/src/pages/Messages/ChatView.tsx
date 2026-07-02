@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { Card, Avatar, Typography, Input, Button, List, Spin, Space, message } from 'antd';
-import { UserOutlined, SendOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { Card, Avatar, Typography, Input, Button, List, Spin, Space, message, Popover } from 'antd';
+import { UserOutlined, SendOutlined, ArrowLeftOutlined, SmileOutlined } from '@ant-design/icons';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -19,6 +19,7 @@ export default function ChatView() {
   const [otherUser, setOtherUser] = useState<any>(null);
   const [targetUserId, setTargetUserId] = useState<number | null>((location.state as any)?.targetUserId || null);
   const listEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<any>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
@@ -91,6 +92,7 @@ export default function ChatView() {
       const newMsg = res.data;
       setMessages(prev => [...prev, newMsg]);
       setText('');
+      inputRef.current?.focus();
       // REST API 已处理消息持久化和实时推送，无需再通过 Socket.IO 重复发送
     } catch (err: any) {
       message.error(err.message || '发送失败');
@@ -102,6 +104,13 @@ export default function ChatView() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.ctrlKey && e.key === 'Enter') handleSend();
   };
+
+  const insertEmoji = (emoji: string) => {
+    setText(prev => prev + emoji);
+    inputRef.current?.focus();
+  };
+
+  const emojiList = ['😀', '😊', '😂', '🤣', '😄', '😅', '😉', '😎', '🤔', '😜', '🤗', '🙏', '👏', '👍', '❤️', '🎉', '🔥', '✅', '❌', '📚', '💡', '🎯'];
 
   // 判断两条消息是否在同一天
   const isSameDay = (a: string, b: string) => dayjs(a).isSame(dayjs(b), 'day');
@@ -182,12 +191,26 @@ export default function ChatView() {
         </div>
 
         {/* 输入框 */}
-        <div style={{ padding: 12, borderTop: '1px solid #f0f0f0', display: 'flex', gap: 8 }}>
+        <div style={{ padding: 12, borderTop: '1px solid #f0f0f0', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Popover
+            trigger="click"
+            placement="topLeft"
+            content={
+              <div style={{ width: 240, display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4 }}>
+                {emojiList.map((emoji, i) => (
+                  <Button key={i} type="text" size="small" style={{ fontSize: 18 }} onClick={() => insertEmoji(emoji)}>{emoji}</Button>
+                ))}
+              </div>
+            }
+          >
+            <Button type="text" icon={<SmileOutlined />} style={{ fontSize: 18 }} />
+          </Popover>
           <Input
+            ref={inputRef}
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入消息... (Ctrl+Enter 发送)"
+            placeholder="输入消息... (Enter 发送)"
             onPressEnter={handleSend}
             style={{ flex: 1 }}
           />

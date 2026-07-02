@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Typography, Tag, Pagination, Card, Button, Space, Modal, Form, Input, Select, InputNumber, message, Row, Col, Empty, Tooltip, Popconfirm, Upload } from 'antd';
-import { ShopOutlined, PlusOutlined, PhoneOutlined, CheckCircleOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
+import { ShopOutlined, PlusOutlined, PhoneOutlined, CheckCircleOutlined, EditOutlined, DeleteOutlined, UploadOutlined, PictureOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
@@ -24,6 +24,7 @@ export default function MarketList() {
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState('');
   const [sort, setSort] = useState('newest');
+  const [hideSold, setHideSold] = useState(true);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -35,16 +36,12 @@ export default function MarketList() {
 
   const fetchData = () => {
     setLoading(true);
-    request.get('/marketplace', { params: { page, pageSize: 12, status: 'all', category: category || undefined } }).then((res: any) => {
-      let list = res.data?.list || [];
-      // 前端排序
-      if (sort === 'price_asc') list.sort((a: any, b: any) => a.price - b.price);
-      else if (sort === 'price_desc') list.sort((a: any, b: any) => b.price - a.price);
-      setData(list); setTotal(res.data?.total || 0);
+    request.get('/marketplace', { params: { page, pageSize: 12, status: hideSold ? 'selling' : 'all', category: category || undefined, sort } }).then((res: any) => {
+      setData(res.data?.list || []); setTotal(res.data?.total || 0);
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [page, category, sort]);
+  useEffect(() => { fetchData(); }, [page, category, sort, hideSold]);
 
   const handleCreate = async (values: any) => {
     try {
@@ -124,12 +121,14 @@ export default function MarketList() {
           <Typography.Text>排序:</Typography.Text>
           <Select value={sort} onChange={setSort} options={sortOptions} style={{ width: 120 }} size="small" />
         </Space>
+        <Tag.CheckableTag checked={!hideSold} onChange={() => { setHideSold(!hideSold); setPage(1); }}>显示已售</Tag.CheckableTag>
       </Space>
       {loading ? <ListSkeleton rows={4} /> : data.length === 0 ? <Empty description="暂无商品" /> : (
         <Row gutter={[16, 16]}>
           {data.map((item: any) => {
             const isSold = item.status === 'sold';
             const isOwner = user?.id === item.seller_id;
+            const itemImages = item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : [];
             return (
               <Col span={6} key={item.id}>
                 <Card
@@ -149,6 +148,15 @@ export default function MarketList() {
                       borderRadius: 4, fontSize: 12, fontWeight: 'bold',
                     }}>已售出</div>
                   )}
+                  <div style={{ marginBottom: 8 }}>
+                    {itemImages.length > 0 ? (
+                      <img src={itemImages[0]} alt={item.title} style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 6 }} />
+                    ) : (
+                      <div style={{ width: '100%', height: 140, background: '#f5f5f5', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 13 }}>
+                        <PictureOutlined style={{ marginRight: 4 }} />用户暂未上传图片
+                      </div>
+                    )}
+                  </div>
                   <Card.Meta
                     title={item.title}
                     description={
@@ -196,7 +204,7 @@ export default function MarketList() {
           })}
         </Row>
       )}
-      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={12} onChange={setPage} /></div>
+      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={12} onChange={setPage} showSizeChanger={false} showTotal={(t) => `共 ${t} 件商品`} /></div>
 
       <Modal title="发布商品" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} width={550}>
         <Form form={form} layout="vertical" onFinish={handleCreate}>

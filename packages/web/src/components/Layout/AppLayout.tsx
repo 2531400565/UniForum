@@ -1,10 +1,10 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Input, Badge, Dropdown, Avatar, Space, Typography, Popover, List, Button, Empty, Tag, theme, Drawer } from 'antd';
+import { Layout, Menu, Input, Badge, Dropdown, Avatar, Space, Typography, Popover, List, Button, Empty, Tag, theme, Drawer, FloatButton, Modal } from 'antd';
 import {
   HomeOutlined, MessageOutlined, NotificationOutlined, ShopOutlined,
   QuestionCircleOutlined, FileTextOutlined, SearchOutlined, UserOutlined,
   LogoutOutlined, SettingOutlined, BellOutlined, HeartOutlined,
-  SunOutlined, MoonOutlined, MenuOutlined, MailOutlined,
+  SunOutlined, MoonOutlined, MenuOutlined, MailOutlined, VerticalAlignTopOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useThemeStore } from '../../stores/useThemeStore';
@@ -120,7 +120,15 @@ export default function AppLayout() {
       { key: 'profile', icon: <UserOutlined />, label: '个人主页', onClick: () => navigate(`/profile/${user?.id}`) },
       { key: 'admin', icon: <SettingOutlined />, label: '管理后台', onClick: () => navigate('/admin'), style: user?.role === 'admin' ? {} : { display: 'none' } },
       { type: 'divider' as const },
-      { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: () => { logout(); navigate('/'); } },
+      { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: () => {
+        Modal.confirm({
+          title: '确认退出登录？',
+          content: '退出后需要重新登录才能使用全部功能。',
+          okText: '退出',
+          cancelText: '取消',
+          onOk: () => { logout(); navigate('/'); },
+        });
+      } },
     ],
   };
 
@@ -277,6 +285,11 @@ export default function AppLayout() {
       <Footer style={{ textAlign: 'center', background: token.colorBgContainer, color: token.colorTextSecondary }}>
         UniForum ©2026 大学校园交流社区
       </Footer>
+      <FloatButton.BackTop visibilityHeight={300} style={{ right: 24, bottom: 80 }}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1677ff', color: '#fff', borderRadius: '50%', fontSize: 18 }}>
+          <VerticalAlignTopOutlined />
+        </div>
+      </FloatButton.BackTop>
     </Layout>
   );
 }

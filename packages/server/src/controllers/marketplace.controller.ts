@@ -9,7 +9,7 @@ import { sanitizeText } from '../utils/sanitize';
 export async function getList(req: AuthRequest, res: Response) {
   try {
     const { limit, offset, page, pageSize } = getPagination(req.query.page, req.query.pageSize);
-    const { category, status, minPrice, maxPrice, keyword } = req.query;
+    const { category, status, minPrice, maxPrice, keyword, sort } = req.query;
     const where: any = {};
     if (!status || status === 'all') {
       where.status = { [Op.in]: ['selling', 'reserved', 'sold'] };
@@ -20,9 +20,13 @@ export async function getList(req: AuthRequest, res: Response) {
     if (keyword) where.title = { [Op.like]: `%${keyword}%` };
     if (minPrice) where.price = { ...where.price, [Op.gte]: parseFloat(minPrice as string) };
     if (maxPrice) where.price = { ...where.price, [Op.lte]: parseFloat(maxPrice as string) };
+    // 后端排序：避免前端只排当前页的问题
+    let order: any = [['created_at', 'DESC']];
+    if (sort === 'price_asc') order = [['price', 'ASC']];
+    else if (sort === 'price_desc') order = [['price', 'DESC']];
     const { count, rows } = await MarketItem.findAndCountAll({
       where, include: [{ model: User, as: 'seller', attributes: ['id', 'nickname', 'avatar_url'] }],
-      limit, offset, order: [['created_at', 'DESC']],
+      limit, offset, order,
     });
     return success(res, paginatedResult(rows, count, page, pageSize));
   } catch (error: any) { return fail(res, error.message, 500); }

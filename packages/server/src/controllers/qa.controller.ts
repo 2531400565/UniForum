@@ -10,10 +10,11 @@ import { pushNotification } from '../services/socketService';
 export async function getQuestions(req: AuthRequest, res: Response) {
   try {
     const { limit, offset, page, pageSize } = getPagination(req.query.page, req.query.pageSize);
-    const { category, status, keyword } = req.query;
+    const { category, status, keyword, authorId } = req.query;
     const where: any = {};
     if (status) where.status = status;
     if (category) where.category = category;
+    if (authorId) where.author_id = parseInt(authorId as string);
     if (keyword) where.title = { [Op.like]: `%${keyword}%` };
     const { count, rows } = await Question.findAndCountAll({
       where, include: [{ model: User, as: 'author', attributes: ['id', 'nickname', 'avatar_url'] }],

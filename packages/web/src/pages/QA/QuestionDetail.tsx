@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Typography, Avatar, Button, Space, Input, List, message, Tag, Divider, Popconfirm } from 'antd';
+import { Card, Typography, Avatar, Button, Space, Input, List, message, Tag, Divider, Popconfirm, Modal, Form, Select } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
 import { UserOutlined, CheckCircleOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import request from '../../api/request';
@@ -17,6 +17,8 @@ export default function QuestionDetail() {
   const [question, setQuestion] = useState<any>(null);
   const [answerText, setAnswerText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm] = Form.useForm();
 
   const fetchQuestion = () => {
     request.get(`/qa/questions/${id}`).then((res: any) => setQuestion(res.data)).finally(() => setLoading(false));
@@ -53,6 +55,25 @@ export default function QuestionDetail() {
     } catch (err: any) { message.error(err.message); }
   };
 
+  const handleEditOpen = () => {
+    editForm.setFieldsValue({ title: question.title, category: question.category, content: question.content });
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = async (values: any) => {
+    try {
+      await request.put(`/qa/questions/${id}`, values);
+      message.success('更新成功'); setEditOpen(false); fetchQuestion();
+    } catch (err: any) { message.error(err.message); }
+  };
+
+  // Ctrl+Enter 快捷回答
+  const handleAnswerKeyDown = (e: React.KeyboardEvent) => {
+    if (e.ctrlKey && e.key === 'Enter' && answerText.trim()) {
+      handleAnswer();
+    }
+  };
+
   if (loading) return <PostDetailSkeleton />;
   if (!question) return <div style={{ textAlign: 'center', padding: 100 }}>问题不存在</div>;
 
@@ -66,7 +87,7 @@ export default function QuestionDetail() {
             <Tag>{question.category}</Tag></Space>
           {isQuestionAuthor && (
             <Space size="small">
-              <Button size="small" icon={<EditOutlined />} onClick={() => message.info('编辑功能开发中')}>编辑</Button>
+              <Button size="small" icon={<EditOutlined />} onClick={handleEditOpen}>编辑</Button>
               <Popconfirm title="确定删除该问题？" onConfirm={handleDeleteQuestion} okText="删除" cancelText="取消">
                 <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
               </Popconfirm>
@@ -74,19 +95,27 @@ export default function QuestionDetail() {
           )}
         </div>
         <Title level={3}>{question.title}</Title>
-        <Space style={{ marginBottom: 16 }}>
+        <Space style={{ marginBottom: 16 }} wrap>
           <Avatar src={question.author?.avatar_url} icon={<UserOutlined />} size="small" />
           <Text>{question.author?.nickname}</Text>
           <Text type="secondary">{dayjs(question.created_at).format('YYYY-MM-DD HH:mm')}</Text>
           <Text type="secondary">{question.view_count}浏览 · {question.answer_count}回答</Text>
         </Space>
+        {question.tags && (() => {
+          const tags = Array.isArray(question.tags) ? question.tags : JSON.parse(question.tags);
+          return tags && tags.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              {tags.map((tag: string, i: number) => <Tag key={i} color="blue">{tag}</Tag>)}
+            </div>
+          );
+        })()}
         <Paragraph style={{ whiteSpace: 'pre-wrap' }}>{question.content}</Paragraph>
       </Card>
 
       <Card title={`回答 (${question.answer_count})`} style={{ marginTop: 16 }}>
         {isLoggedIn && (
           <div style={{ marginBottom: 16 }}>
-            <TextArea rows={3} value={answerText} onChange={e => setAnswerText(e.target.value)} placeholder="写下你的回答..." />
+            <TextArea rows={3} value={answerText} onChange={e => setAnswerText(e.target.value)} onKeyDown={handleAnswerKeyDown} placeholder="写下你的回答... (Ctrl+Enter 提交)" />
             <Button type="primary" style={{ marginTop: 8 }} onClick={handleAnswer} disabled={!answerText.trim()}>提交回答</Button>
           </div>
         )}
@@ -110,6 +139,15 @@ export default function QuestionDetail() {
           </List.Item>
         )} />
       </Card>
+      <Modal title="编辑问题" open={editOpen} onCancel={() => setEditOpen(false)} onOk={() => editForm.submit()} width={550}>
+        <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
+          <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="category" label="分类" rules={[{ required: true }]}><Select options={[
+            { label: '选课', value: 'course' }, { label: '实习', value: 'internship' }, { label: '就业', value: 'career' }, { label: '学术', value: 'academic' }, { label: '其他', value: 'other' },
+          ]} /></Form.Item>
+          <Form.Item name="content" label="详细描述" rules={[{ required: true }]}><Input.TextArea rows={5} /></Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

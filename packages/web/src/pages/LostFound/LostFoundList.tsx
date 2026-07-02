@@ -126,7 +126,7 @@ export default function LostFoundList() {
       </Space>
       {loading ? <ListSkeleton rows={6} /> : (
         <List dataSource={data} renderItem={(item: any) => (
-          <Card style={{ marginBottom: 12, cursor: 'pointer' }} hoverable onClick={() => navigate(`/lost-found/${item.id}`)}>
+          <Card style={{ marginBottom: 12, cursor: 'pointer', opacity: item.status !== 'open' ? 0.6 : 1 }} hoverable onClick={() => navigate(`/lost-found/${item.id}`)}>
             <div style={{ display: 'flex', gap: 12 }}>
               {item.images && (() => {
                 const images = typeof item.images === 'string' ? JSON.parse(item.images) : item.images;
@@ -172,7 +172,7 @@ export default function LostFoundList() {
           </Card>
         )} />
       )}
-      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={15} onChange={setPage} /></div>
+      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={15} onChange={setPage} showSizeChanger={false} showTotal={(t) => `共 ${t} 条记录`} /></div>
 
       <Modal title="发布失物招领" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} width={500}>
         <Form form={form} layout="vertical" onFinish={handleCreate}>

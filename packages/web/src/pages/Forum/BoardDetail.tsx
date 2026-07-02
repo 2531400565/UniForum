@@ -60,7 +60,7 @@ export default function BoardDetail() {
         )}
       />
       <div style={{ textAlign: 'center', marginTop: 16 }}>
-        <Pagination current={page} total={total} pageSize={15} onChange={setPage} />
+        <Pagination current={page} total={total} pageSize={15} onChange={setPage} showSizeChanger={false} showTotal={(t) => `共 ${t} 篇帖子`} />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { List, Typography, Tag, Pagination, Card, Button, Space, Modal, Form, Input, Select, message, Spin } from 'antd';
-import { QuestionCircleOutlined, PlusOutlined, CheckCircleOutlined, RobotOutlined } from '@ant-design/icons';
+import { QuestionCircleOutlined, PlusOutlined, CheckCircleOutlined, RobotOutlined, SearchOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +15,8 @@ export default function QuestionList() {
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [keyword, setKeyword] = useState('');
+  const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form] = Form.useForm();
@@ -22,12 +24,12 @@ export default function QuestionList() {
 
   const fetchData = () => {
     setLoading(true);
-    request.get('/qa/questions', { params: { page, pageSize: 15 } }).then((res: any) => {
+    request.get('/qa/questions', { params: { page, pageSize: 15, keyword: keyword || undefined, category: category || undefined } }).then((res: any) => {
       setData(res.data?.list || []); setTotal(res.data?.total || 0);
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [page]);
+  useEffect(() => { fetchData(); }, [page, keyword, category]);
 
   const handleCreate = async (values: any) => {
     try {
@@ -49,6 +51,20 @@ export default function QuestionList() {
           </Space>
         )}
       </div>
+      <Space style={{ marginBottom: 16 }} wrap>
+        <Input.Search
+          placeholder="搜索问题..."
+          allowClear
+          style={{ width: 250 }}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+        />
+        <Space>
+          <Typography.Text>分类:</Typography.Text>
+          {['', 'course', 'internship', 'career', 'academic', 'other'].map(k => (
+            <Tag.CheckableTag key={k} checked={category === k} onChange={() => { setCategory(k); setPage(1); }}>{k ? categoryLabels[k] : '全部'}</Tag.CheckableTag>
+          ))}
+        </Space>
+      </Space>
       {loading ? <ListSkeleton rows={6} /> : (
         <List dataSource={data} renderItem={(item: any) => (
           <Card style={{ marginBottom: 12, cursor: 'pointer' }} hoverable onClick={() => navigate(`/qa/${item.id}`)}>
@@ -62,7 +78,7 @@ export default function QuestionList() {
           </Card>
         )} />
       )}
-      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={15} onChange={setPage} /></div>
+      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={15} onChange={setPage} showSizeChanger={false} showTotal={(t) => `共 ${t} 个问题`} /></div>
 
       <Modal title="提出问题" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} width={550}>
         <Form form={form} layout="vertical" onFinish={handleCreate}>

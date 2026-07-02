@@ -13,7 +13,8 @@ export default function Register() {
   const onFinish = async (values: any) => {
     setLoading(true);
     try {
-      const res: any = await request.post('/auth/register', values);
+      const { confirmPassword, ...registerData } = values;
+      const res: any = await request.post('/auth/register', registerData);
       if (res.code === 200) {
         setAuth(res.data.user, res.data.accessToken, res.data.refreshToken);
         message.success('注册成功');
@@ -50,6 +51,17 @@ export default function Register() {
           </Form.Item>
           <Form.Item name="password" rules={[{ required: true, min: 6, message: '密码至少6位' }]}>
             <Input.Password prefix={<LockOutlined />} placeholder="密码" size="large" />
+          </Form.Item>
+          <Form.Item name="confirmPassword" dependencies={['password']} rules={[
+            { required: true, message: '请确认密码' },
+            ({ getFieldValue }: any) => ({
+              validator(_: any, value: any) {
+                if (!value || getFieldValue('password') === value) return Promise.resolve();
+                return Promise.reject(new Error('两次输入的密码不一致'));
+              },
+            }),
+          ]}>
+            <Input.Password prefix={<LockOutlined />} placeholder="确认密码" size="large" />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading} block size="large">注册</Button>

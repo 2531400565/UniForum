@@ -9,12 +9,13 @@ import { getPagination, paginatedResult } from '../utils/pagination';
 export async function getResources(req: AuthRequest, res: Response) {
   try {
     const { limit, offset, page, pageSize } = getPagination(req.query.page, req.query.pageSize);
-    const { category, subject, keyword, status } = req.query;
+    const { category, subject, keyword, status, uploaderId } = req.query;
     const where: any = {};
     if (status) where.status = status;
     else where.status = 'active';
     if (category) where.category = category;
     if (subject) where.subject = subject;
+    if (uploaderId) where.uploader_id = parseInt(uploaderId as string);
     if (keyword) where[Op.or] = [{ title: { [Op.like]: `%${keyword}%` } }, { description: { [Op.like]: `%${keyword}%` } }];
     const { count, rows } = await Resource.findAndCountAll({
       where, include: [{ model: User, as: 'uploader', attributes: ['id', 'nickname', 'avatar_url'] }],

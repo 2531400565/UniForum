@@ -4,6 +4,17 @@ import { SendOutlined, RobotOutlined, UserOutlined, ArrowLeftOutlined, ClearOutl
 import { useNavigate } from 'react-router-dom';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+
+marked.setOptions({ breaks: true, gfm: true });
+
+function renderMarkdown(content: string): string {
+  const html = marked.parse(content) as string;
+  return DOMPurify.sanitize(html);
+}
+
+const STORAGE_KEY = 'ai_chat_messages';
 
 const { Text, Paragraph } = Typography;
 
@@ -25,6 +36,26 @@ export default function AIChat() {
   // 自动滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // 从 localStorage 加载历史对话
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setMessages(parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })));
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  // 保存对话到 localStorage
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }, [messages]);
 
   // 发送消息
@@ -80,6 +111,7 @@ export default function AIChat() {
   // 清空对话
   const handleClear = () => {
     setMessages([]);
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   // 回车发送
@@ -150,7 +182,7 @@ export default function AIChat() {
                     color: msg.role === 'user' ? '#fff' : 'inherit',
                   }}
                 >
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                  <div className="post-content" style={{ fontSize: 14 }} dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
                   <div
                     style={{
                       fontSize: 11,

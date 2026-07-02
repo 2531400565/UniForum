@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, Avatar, Typography, Descriptions, Tag, Space, Button, Form, Input, Modal, message, Tabs, List, Empty, Statistic, Upload, Spin } from 'antd';
-import { UserOutlined, EditOutlined, TeamOutlined, MailOutlined, CameraOutlined } from '@ant-design/icons';
+import { UserOutlined, EditOutlined, TeamOutlined, MailOutlined, CameraOutlined, LockOutlined } from '@ant-design/icons';
 import type { UploadRequestOption } from 'rc-upload/lib/interface';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import request from '../../api/request';
@@ -40,6 +40,16 @@ export default function ProfilePage() {
   const [postLoading, setPostLoading] = useState(false);
   const [postTotal, setPostTotal] = useState(0);
   const [postListPage, setPostListPage] = useState(1);
+  const [pwdOpen, setPwdOpen] = useState(false);
+  const [pwdForm] = Form.useForm();
+  const [questionList, setQuestionList] = useState<any[]>([]);
+  const [questionLoading, setQuestionLoading] = useState(false);
+  const [questionTotal, setQuestionTotal] = useState(0);
+  const [questionPage, setQuestionPage] = useState(1);
+  const [resourceList, setResourceList] = useState<any[]>([]);
+  const [resourceLoading, setResourceLoading] = useState(false);
+  const [resourceTotal, setResourceTotal] = useState(0);
+  const [resourcePage, setResourcePage] = useState(1);
 
   useEffect(() => {
     request.get(`/users/${id}`).then((res: any) => setProfile(res.data)).catch(() => {}).finally(() => setLoading(false));
@@ -56,6 +66,10 @@ export default function ProfilePage() {
       fetchFollowList(activeTab === 'followings' ? 'followings' : 'followers', 1);
     } else if (activeTab === 'posts') {
       fetchUserPosts(1);
+    } else if (activeTab === 'questions') {
+      fetchUserQuestions(1);
+    } else if (activeTab === 'resources') {
+      fetchUserResources(1);
     }
   }, [activeTab, id]);
 
@@ -87,6 +101,36 @@ export default function ProfilePage() {
       setPostListPage(page);
     }).catch(() => {}).finally(() => setPostLoading(false));
   }, [id]);
+
+  const fetchUserQuestions = useCallback((page: number) => {
+    setQuestionLoading(true);
+    if (page === 1) setQuestionList([]);
+    request.get('/qa/questions', { params: { authorId: id, page, pageSize: 10 } }).then((res: any) => {
+      const newList = res.data?.list || [];
+      setQuestionList(prev => page === 1 ? newList : [...prev, ...newList]);
+      setQuestionTotal(res.data?.total || 0);
+      setQuestionPage(page);
+    }).catch(() => {}).finally(() => setQuestionLoading(false));
+  }, [id]);
+
+  const fetchUserResources = useCallback((page: number) => {
+    setResourceLoading(true);
+    if (page === 1) setResourceList([]);
+    request.get('/resources', { params: { uploaderId: id, page, pageSize: 10 } }).then((res: any) => {
+      const newList = res.data?.list || [];
+      setResourceList(prev => page === 1 ? newList : [...prev, ...newList]);
+      setResourceTotal(res.data?.total || 0);
+      setResourcePage(page);
+    }).catch(() => {}).finally(() => setResourceLoading(false));
+  }, [id]);
+
+  const handlePasswordChange = async (values: any) => {
+    try {
+      await request.put(`/users/${id}/password`, { oldPassword: values.oldPassword, newPassword: values.newPassword });
+      message.success('密码修改成功，请重新登录');
+      setPwdOpen(false); pwdForm.resetFields();
+    } catch (err: any) { message.error(err.message); }
+  };
 
   const handleAvatarUpload = async (options: UploadRequestOption) => {
     const { file } = options;
@@ -212,6 +256,67 @@ export default function ProfilePage() {
     { key: 'followers', label: `粉丝 ${profile.followerCount || 0}`, children: renderUserList('followers') },
   ];
 
+  tabItems.push({
+    key: 'questions',
+    label: `问答 ${profile.questionCount || questionTotal}`, children: (
+      <List
+        loading={questionLoading && questionList.length === 0}
+        dataSource={questionList}
+        locale={{ emptyText: <Empty description="暂无提问" /> }}
+        renderItem={(item: any) => (
+          <List.Item>
+            <List.Item.Meta
+              title={<Link to={`/qa/${item.id}`}>{item.title}</Link>}
+              description={
+                <Space>
+                  <Tag color={item.status === 'resolved' ? 'green' : 'orange'}>{item.status === 'resolved' ? '已解决' : '待解答'}</Tag>
+                  <Tag>{item.category}</Tag>
+                  <Typography.Text type="secondary">{item.answer_count}回答 · {item.view_count}浏览</Typography.Text>
+                  <Typography.Text type="secondary">{dayjs(item.created_at).format('YYYY-MM-DD')}</Typography.Text>
+                </Space>
+              }
+            />
+          </List.Item>
+        )}
+        loadMore={questionList.length < questionTotal ? (
+          <div style={{ textAlign: 'center', marginTop: 12 }}>
+            <Button onClick={() => fetchUserQuestions(questionPage + 1)} loading={questionLoading}>加载更多</Button>
+          </div>
+        ) : null}
+      />
+    ),
+  });
+  tabItems.push({
+    key: 'resources',
+    label: `资源 ${profile.resourceCount || resourceTotal}`, children: (
+      <List
+        loading={resourceLoading && resourceList.length === 0}
+        dataSource={resourceList}
+        locale={{ emptyText: <Empty description="暂无资源" /> }}
+        renderItem={(item: any) => (
+          <List.Item>
+            <List.Item.Meta
+              title={<Typography.Text strong>{item.title}</Typography.Text>}
+              description={
+                <Space>
+                  <Tag>{item.category}</Tag>
+                  {item.subject && <Tag color="blue">{item.subject}</Tag>}
+                  <Typography.Text type="secondary">{item.download_count}下载</Typography.Text>
+                  <Typography.Text type="secondary">{dayjs(item.created_at).format('YYYY-MM-DD')}</Typography.Text>
+                </Space>
+              }
+            />
+          </List.Item>
+        )}
+        loadMore={resourceList.length < resourceTotal ? (
+          <div style={{ textAlign: 'center', marginTop: 12 }}>
+            <Button onClick={() => fetchUserResources(resourcePage + 1)} loading={resourceLoading}>加载更多</Button>
+          </div>
+        ) : null}
+      />
+    ),
+  });
+
   if (isOwner) {
     tabItems.push({
       key: 'favorites',
@@ -282,12 +387,37 @@ export default function ProfilePage() {
           <Descriptions.Item label="简介">{profile.bio || '-'}</Descriptions.Item>
           <Descriptions.Item label="资源数">{profile.resourceCount || 0}</Descriptions.Item>
         </Descriptions>
-        {isOwner && <Button type="primary" icon={<EditOutlined />} style={{ marginTop: 16 }} onClick={() => { setEditOpen(true); form.setFieldsValue(profile); }}>编辑资料</Button>}
+        {isOwner && <Space style={{ marginTop: 16 }}>
+          <Button type="primary" icon={<EditOutlined />} onClick={() => { setEditOpen(true); form.setFieldsValue(profile); }}>编辑资料</Button>
+          <Button icon={<LockOutlined />} onClick={() => setPwdOpen(true)}>修改密码</Button>
+        </Space>}
       </Card>
 
       <Card ref={tabsRef as any} style={{ marginTop: 16 }}>
         <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems} />
       </Card>
+
+      <Modal title="修改密码" open={pwdOpen} onCancel={() => setPwdOpen(false)} onOk={() => pwdForm.submit()} width={400}>
+        <Form form={pwdForm} layout="vertical" onFinish={handlePasswordChange}>
+          <Form.Item name="oldPassword" label="旧密码" rules={[{ required: true, message: '请输入旧密码' }]}>
+            <Input.Password placeholder="请输入旧密码" />
+          </Form.Item>
+          <Form.Item name="newPassword" label="新密码" rules={[{ required: true, min: 6, message: '密码至少6位' }]}>
+            <Input.Password placeholder="请输入新密码" />
+          </Form.Item>
+          <Form.Item name="confirmNewPassword" dependencies={['newPassword']} rules={[
+            { required: true, message: '请确认新密码' },
+            ({ getFieldValue }: any) => ({
+              validator(_: any, value: any) {
+                if (!value || getFieldValue('newPassword') === value) return Promise.resolve();
+                return Promise.reject(new Error('两次输入的密码不一致'));
+              },
+            }),
+          ]}>
+            <Input.Password placeholder="请确认新密码" />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal title="编辑资料" open={editOpen} onCancel={() => setEditOpen(false)} onOk={() => form.submit()} width={420}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>

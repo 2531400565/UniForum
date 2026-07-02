@@ -7,6 +7,18 @@ import { getPagination, paginatedResult } from '../utils/pagination';
 import { sanitize, sanitizeText } from '../utils/sanitize';
 import { pushNotification } from '../services/socketService';
 
+// 浏览量防重复：基于 IP + postId 的内存缓存，1小时内同一IP重复访问不计数
+const viewCache = new Map<string, number>(); // key: `${ip}:${postId}`, value: timestamp
+const VIEW_CACHE_TTL = 60 * 60 * 1000; // 1小时
+
+// 定期清理过期缓存（每10分钟）
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, ts] of viewCache) {
+    if (now - ts > VIEW_CACHE_TTL) viewCache.delete(key);
+  }
+}, 10 * 60 * 1000);
+
 export async function getPosts(req: AuthRequest, res: Response) {
   try {
     const { limit, offset, page, pageSize } = getPagination(req.query.page, req.query.pageSize);
@@ -55,9 +67,15 @@ export async function getPost(req: AuthRequest, res: Response) {
     });
     if (!post || post.status === 'deleted') return fail(res, '帖子不存在', 404);
 
-    // Increment view count（作者自己不计数）
+    // 浏览量防重复：同一IP 1小时内重复访问不计数
     if (post.author_id !== req.userId) {
-      await post.increment('view_count');
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+      const cacheKey = `${ip}:${post.id}`;
+      const lastView = viewCache.get(cacheKey);
+      if (!lastView || Date.now() - lastView > VIEW_CACHE_TTL) {
+        await post.increment('view_count');
+        viewCache.set(cacheKey, Date.now());
+      }
     }
 
     const postData = post.toJSON() as any;

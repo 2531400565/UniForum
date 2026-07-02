@@ -5,6 +5,8 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import request from '../../api/request';
 import { useDraft } from '../../hooks/useDraft';
+import DOMPurify from 'dompurify';
+import { Typography } from 'antd';
 
 // 工具栏配置放在组件外部，避免每次渲染重建
 const TOOLBAR_CONFIG = [
@@ -28,6 +30,7 @@ export default function CreatePost() {
   const [boardId, setBoardId] = useState<number | undefined>((location.state as any)?.boardId);
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [previewMode, setPreviewMode] = useState(false);
   const [tagOptions, setTagOptions] = useState<any[]>([]);
   const quillRef = useRef<any>(null);
   const { saveDraft, loadDraft, clearDraft, updateRefs } = useDraft(isEdit ? `edit_${editId}` : 'new_post');
@@ -182,16 +185,28 @@ export default function CreatePost() {
           />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>内容</label>
-          <ReactQuill
-            ref={quillRef}
-            theme="snow"
-            value={content}
-            onChange={setContent}
-            modules={modules}
-            placeholder="写下你的帖子内容，支持图文混排..."
-            style={{ minHeight: 300 }}
-          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <label style={{ fontWeight: 500 }}>内容</label>
+            <Button size="small" type={previewMode ? 'primary' : 'default'} onClick={() => setPreviewMode(!previewMode)}>
+              {previewMode ? '返回编辑' : '预览'}
+            </Button>
+          </div>
+          {previewMode ? (
+            <Card style={{ minHeight: 300 }}>
+              <Typography.Title level={3}>{title || '（无标题）'}</Typography.Title>
+              <div className="post-content" style={{ fontSize: 15, lineHeight: 1.8 }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content || '<p>（无内容）</p>') }} />
+            </Card>
+          ) : (
+            <ReactQuill
+              ref={quillRef}
+              theme="snow"
+              value={content}
+              onChange={setContent}
+              modules={modules}
+              placeholder="写下你的帖子内容，支持图文混排..."
+              style={{ minHeight: 300 }}
+            />
+          )}
         </div>
         <Button type="primary" size="large" loading={loading} onClick={handleSubmit}>{isEdit ? '保存修改' : '发布 (Ctrl+Enter)'}</Button>
         {!isEdit && <Button size="large" style={{ marginLeft: 12 }} onClick={() => { saveDraft(title, content, boardId, tags); message.success('草稿已保存'); }}>保存草稿</Button>}

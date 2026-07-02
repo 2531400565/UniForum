@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Form, Input, Button, Card, message, Typography } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, message, Typography, Modal } from 'antd';
+import { UserOutlined, LockOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -42,8 +42,15 @@ export default function Login() {
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading} block size="large">登录</Button>
           </Form.Item>
-          <div style={{ textAlign: 'center' }}>
-            还没有账号？<Link to="/register">立即注册</Link>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Button type="link" style={{ paddingLeft: 0 }} icon={<QuestionCircleOutlined />} onClick={() => {
+              Modal.info({
+                title: '忘记密码',
+                content: '请联系管理员重置密码，提供你的注册邮箱信息即可。',
+                okText: '知道了',
+              });
+            }}>忘记密码？</Button>
+            <span>还没有账号？<Link to="/register">立即注册</Link></span>
           </div>
         </Form>
       </Card>

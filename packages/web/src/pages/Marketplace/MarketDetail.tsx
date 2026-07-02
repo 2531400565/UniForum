@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Typography, Avatar, Tag, Space, Button, message, Spin, Popconfirm, Modal, Form, Input, Select, InputNumber, Row, Col, Upload } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
-import { UserOutlined, PhoneOutlined, DeleteOutlined, CheckCircleOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons';
+import { UserOutlined, PhoneOutlined, DeleteOutlined, CheckCircleOutlined, EditOutlined, UploadOutlined, PictureOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
@@ -112,16 +112,22 @@ export default function MarketDetail() {
           {item.original_price && <Text delete type="secondary" style={{ marginLeft: 12, fontSize: 16 }}>¥{item.original_price}</Text>}
         </div>
         <Paragraph style={{ fontSize: 15, lineHeight: 1.8 }}>{item.description}</Paragraph>
-        {item.images && (() => {
-          const images = typeof item.images === 'string' ? JSON.parse(item.images) : item.images;
-          return images && images.length > 0 && (
+        {(() => {
+          const images = item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : [];
+          return (
             <div style={{ marginTop: 16 }}>
               <Text strong style={{ display: 'block', marginBottom: 8 }}>商品图片:</Text>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {images.map((url: string, i: number) => (
-                  <img key={i} src={url} alt={`商品图片${i + 1}`} style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 6, border: '1px solid #f0f0f0' }} />
-                ))}
-              </div>
+              {images.length > 0 ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {images.map((url: string, i: number) => (
+                    <img key={i} src={url} alt={`商品图片${i + 1}`} style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 6, border: '1px solid #f0f0f0' }} />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: '16px', background: '#f5f5f5', borderRadius: 6, textAlign: 'center', color: '#999' }}>
+                  <PictureOutlined style={{ marginRight: 4 }} />用户暂未上传图片
+                </div>
+              )}
             </div>
           );
         })()}

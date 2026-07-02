@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { List, Typography, Tag, Pagination, Card, Button, Rate, Space, Upload, Modal, Form, Input, Select, message } from 'antd';
-import { FileTextOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons';
+import { List, Typography, Tag, Pagination, Card, Button, Rate, Space, Upload, Modal, Form, Input, Select, message, Tooltip } from 'antd';
+import { FileTextOutlined, UploadOutlined, DownloadOutlined, SearchOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import request from '../../api/request';
 import { useAuthStore } from '../../stores/useAuthStore';
 import dayjs from 'dayjs';
@@ -14,6 +14,7 @@ export default function ResourceList() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState('');
+  const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form] = Form.useForm();
@@ -21,12 +22,12 @@ export default function ResourceList() {
 
   const fetchData = () => {
     setLoading(true);
-    request.get('/resources', { params: { page, pageSize: 15, category: category || undefined } }).then((res: any) => {
+    request.get('/resources', { params: { page, pageSize: 15, category: category || undefined, keyword: keyword || undefined } }).then((res: any) => {
       setData(res.data?.list || []); setTotal(res.data?.total || 0);
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [page, category]);
+  useEffect(() => { fetchData(); }, [page, category, keyword]);
 
   const handleUpload = async (values: any) => {
     const formData = new FormData();
@@ -47,7 +48,13 @@ export default function ResourceList() {
         <Typography.Title level={3}><FileTextOutlined /> 学习资源</Typography.Title>
         {isLoggedIn && <Button type="primary" icon={<UploadOutlined />} onClick={() => setModalOpen(true)}>上传资源</Button>}
       </div>
-      <Space style={{ marginBottom: 16 }}>
+      <Space style={{ marginBottom: 16 }} wrap>
+        <Input.Search
+          placeholder="搜索资源..."
+          allowClear
+          style={{ width: 220 }}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+        />
         {['', 'slides', 'notes', 'booklist', 'exam', 'other'].map(k => (
           <Tag.CheckableTag key={k} checked={category === k} onChange={() => { setCategory(k); setPage(1); }}>{k ? categoryLabels[k] : '全部'}</Tag.CheckableTag>
         ))}
@@ -58,7 +65,9 @@ export default function ResourceList() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div><Typography.Text strong style={{ fontSize: 16 }}>{item.title}</Typography.Text>
                 <div style={{ marginTop: 4 }}><Tag>{categoryLabels[item.category]}</Tag>{item.subject && <Tag color="blue">{item.subject}</Tag>}
-                  <Rate disabled value={item.avg_rating} style={{ fontSize: 14 }} /><Typography.Text type="secondary"> ({item.rating_count})</Typography.Text>
+                  <Tooltip title="下载后可评分">
+                    <Rate disabled value={item.avg_rating} style={{ fontSize: 14 }} /><Typography.Text type="secondary"> ({item.rating_count})</Typography.Text>
+                  </Tooltip>
                 </div>
                 {item.description && <Typography.Paragraph ellipsis type="secondary" style={{ marginTop: 4 }}>{item.description}</Typography.Paragraph>}
               </div>
@@ -100,7 +109,7 @@ export default function ResourceList() {
           </Card>
         )} />
       )}
-      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={15} onChange={setPage} /></div>
+      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={15} onChange={setPage} showSizeChanger={false} showTotal={(t) => `共 ${t} 个资源`} /></div>
 
       <Modal title="上传学习资源" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} width={500}>
         <Form form={form} layout="vertical" onFinish={handleUpload}>
@@ -108,9 +117,12 @@ export default function ResourceList() {
           <Form.Item name="category" label="分类" rules={[{ required: true }]}><Select options={Object.entries(categoryLabels).map(([k, v]) => ({ label: v, value: k }))} /></Form.Item>
           <Form.Item name="subject" label="科目"><Input placeholder="如：高等数学、数据结构" /></Form.Item>
           <Form.Item name="description" label="描述"><Input.TextArea rows={2} /></Form.Item>
-          <Form.Item label="文件" required><Upload beforeUpload={() => false} fileList={fileList} onChange={({ fileList }) => setFileList(fileList)} maxCount={1}>
-            <Button icon={<UploadOutlined />}>选择文件</Button>
-          </Upload></Form.Item>
+          <Form.Item label="文件" required>
+            <Upload beforeUpload={() => false} fileList={fileList} onChange={({ fileList }) => setFileList(fileList)} maxCount={1} accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.7z,.txt">
+              <Button icon={<UploadOutlined />}>选择文件</Button>
+            </Upload>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>支持 PDF/Word/PPT/Excel/ZIP/RAR/TXT 等格式，最大 50MB</Typography.Text>
+          </Form.Item>
         </Form>
       </Modal>
     </div>

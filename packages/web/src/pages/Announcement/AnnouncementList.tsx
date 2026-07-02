@@ -46,7 +46,7 @@ export default function AnnouncementList() {
           </div>
         </Card>
       )} />
-      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={15} onChange={setPage} /></div>
+      <div style={{ textAlign: 'center', marginTop: 16 }}><Pagination current={page} total={total} pageSize={15} onChange={setPage} showSizeChanger={false} showTotal={(t) => `共 ${t} 条公告`} /></div>
     </div>
   );
 }
